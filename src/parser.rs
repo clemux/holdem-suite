@@ -1,7 +1,8 @@
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while};
-use nom::character::complete::{alpha1, char, line_ending, not_line_ending, u32};
+use nom::bytes::complete::{tag, take_until, take_while};
+use nom::character::complete::{alpha1, anychar, char, line_ending, not_line_ending, u32};
 use nom::combinator::{map, opt, rest};
+use nom::multi::many_till;
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
@@ -231,12 +232,10 @@ struct TableInfo {
 
 impl TableInfo {
     fn parse(input: &str) -> IResult<&str, TableInfo> {
-        let (input, (_, table_name, _, max_players, _, currency, _, button, _)) = tuple((
-            tag("Table: "),
-            TableName::parse,
+        let (input, (table_name, _, max_players, currency, _, button, _)) = tuple((
+            preceded(tag("Table: "), TableName::parse),
             tag(" "),
-            u32,
-            tag("-max "),
+            terminated(u32, tag("-max ")),
             delimited(tag("("), MoneyType::parse, tag(")")),
             tag(" "),
             preceded(tag("Seat #"), u32),
@@ -250,6 +249,157 @@ impl TableInfo {
                 max_players,
                 currency,
                 button,
+            },
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Stack {
+    Chips(u32),
+    Money(f32),
+}
+
+impl Stack {
+    fn parse(input: &str) -> IResult<&str, Stack> {
+        let stack_chips = map(u32, Stack::Chips);
+        let stack_money = map(terminated(float, tag("€")), Stack::Money);
+        let (input, stack) = alt((stack_money, stack_chips)).parse(input)?;
+        Ok((input, stack))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Seat {
+    seat_number: u32,
+    player_name: String,
+    stack: Stack,
+    bounty: Option<f32>,
+}
+
+// input: Seat 5: WinterSound (20000, 0.45€ bounty)
+impl Seat {
+    fn parse(input: &str) -> IResult<&str, Seat> {
+        let stack_bounty = tuple((
+            Stack::parse,
+            opt(preceded(tag(", "), terminated(float, tag("€ bounty")))),
+        ));
+        let (input, (seat_number, _, player_name, _, (stack, bounty))) = tuple((
+            preceded(tag("Seat "), u32),
+            tag(": "),
+            take_while(|c| c != ' '),
+            tag(" "),
+            delimited(tag("("), stack_bounty, tag(")")),
+        ))
+        .parse(input)?;
+        Ok((
+            input,
+            Seat {
+                seat_number,
+                player_name: player_name.to_owned(),
+                stack,
+                bounty,
+            },
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum AmountType {
+    Chips(u32),
+    Money(f32),
+}
+
+impl AmountType {
+    fn parse(input: &str) -> IResult<&str, AmountType> {
+        let amount_chips = map(u32, AmountType::Chips);
+        let amount_money = map(terminated(float, tag("€")), AmountType::Money);
+        let (input, amount) = alt((amount_money, amount_chips)).parse(input)?;
+        Ok((input, amount))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum PostType {
+    BigBlind(AmountType),
+    SmallBlind(AmountType),
+    Ante(AmountType),
+}
+
+impl PostType {
+    fn parse(input: &str) -> IResult<&str, PostType> {
+        let small_blind = map(
+            preceded(tag("small blind "), AmountType::parse),
+            PostType::SmallBlind,
+        );
+        let big_blind = map(
+            preceded(tag("big blind "), AmountType::parse),
+            PostType::BigBlind,
+        );
+        let ante = map(preceded(tag("ante "), AmountType::parse), PostType::Ante);
+        let (input, post_type) = alt((small_blind, big_blind, ante)).parse(input)?;
+        Ok((input, post_type))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum ActionType {
+    Bet {
+        amount: AmountType,
+    },
+    Call {
+        amount: AmountType,
+    },
+    Check,
+    Fold,
+    Post(PostType),
+    Raise {
+        to_call: AmountType,
+        amount: AmountType,
+    },
+}
+
+impl ActionType {
+    fn parse(input: &str) -> IResult<&str, ActionType> {
+        let (input, action_type) = alt((
+            map(preceded(tag("posts "), PostType::parse), ActionType::Post),
+            map(tag("checks"), |_| ActionType::Check),
+            map(tag("folds"), |_| ActionType::Fold),
+            map(preceded(tag("calls "), AmountType::parse), |x| {
+                ActionType::Call { amount: x }
+            }),
+            map(preceded(tag("bets "), AmountType::parse), |x| {
+                ActionType::Bet { amount: x }
+            }),
+            map(
+                preceded(
+                    tag("raises "),
+                    tuple((AmountType::parse, tag(" to "), AmountType::parse)),
+                ),
+                |(to_call, _, amount)| ActionType::Raise { to_call, amount },
+            ),
+        ))(input)?;
+        Ok((input, action_type))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Action {
+    player_name: String,
+    action: ActionType,
+    is_all_in: bool,
+}
+
+impl Action {
+    fn parse(input: &str) -> IResult<&str, Action> {
+        let (input, (player_name_vec, action_type)) =
+            many_till(anychar, preceded(tag(" "), ActionType::parse))(input)?;
+        Ok((
+            input,
+            Action {
+                player_name: player_name_vec.into_iter().collect(),
+                action: action_type,
+                is_all_in: false,
             },
         ))
     }
@@ -331,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hand_info() {
+    fn test_hand_info_tournament() {
         let input = "Winamax Poker - Tournament \"WESTERN\" buyIn: 0.90€ + 0.10€ level: 6 - HandId: \
         #2815488303912976462-15-1684698584 - Holdem no limit (60/250/500) - 2023/05/21 19:49:44 UTC\n";
 
@@ -427,6 +577,140 @@ mod tests {
             button: 3,
         };
         let (_, actual) = TableInfo::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_seat_chips_with_bounty() {
+        let input = "Seat 5: WinterSound (20000, 0.45€ bounty)\n";
+        let expected = Seat {
+            seat_number: 5,
+            player_name: String::from("WinterSound"),
+            stack: Stack::Chips(20000),
+            bounty: Some(0.45),
+        };
+        let (_, actual) = Seat::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_seat_chips_without_bounty() {
+        let input = "Seat 3: WinterSound (18744)\n";
+        let expected = Seat {
+            seat_number: 3,
+            player_name: String::from("WinterSound"),
+            stack: Stack::Chips(18744),
+            bounty: None,
+        };
+        let (_, actual) = Seat::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_seat_cashgame() {
+        let input = "Seat 3: WinterSound (0.50€)\n";
+        let expected = Seat {
+            seat_number: 3,
+            player_name: String::from("WinterSound"),
+            stack: Stack::Money(0.50),
+            bounty: None,
+        };
+        let (_, actual) = Seat::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_post_type_sb() {
+        let input = "small blind 250\n";
+        let expected = PostType::SmallBlind(AmountType::Chips(250));
+        let (_, actual) = PostType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_post_type_bb_cash() {
+        let input = "big blind 0.02€\n";
+        let expected = PostType::BigBlind(AmountType::Money(0.02));
+        let (_, actual) = PostType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_post_type_ante_chips() {
+        let input = "big blind 60\n";
+        let expected = PostType::BigBlind(AmountType::Chips(60));
+        let (_, actual) = PostType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_type_post_bb() {
+        let input = "posts big blind 500\n";
+        let expected = ActionType::Post(PostType::BigBlind(AmountType::Chips(500)));
+        let (_, actual) = ActionType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_type_check() {
+        let input = "checks\n";
+        let expected = ActionType::Check;
+        let (_, actual) = ActionType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_type_call() {
+        let input = "calls 500\n";
+        let expected = ActionType::Call {
+            amount: AmountType::Chips(500),
+        };
+        let (_, actual) = ActionType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_type_bet() {
+        let input = "bets 500\n";
+        let expected = ActionType::Bet {
+            amount: AmountType::Chips(500),
+        };
+        let (_, actual) = ActionType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_type_raise() {
+        let input = "raises 500 to 1000\n";
+        let expected = ActionType::Raise {
+            to_call: AmountType::Chips(500),
+            amount: AmountType::Chips(1000),
+        };
+        let (_, actual) = ActionType::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_fold() {
+        let input = "As 2 carrot folds\n";
+        let expected = Action {
+            player_name: String::from("As 2 carrot"),
+            action: ActionType::Fold,
+            is_all_in: false,
+        };
+        let (_, actual) = Action::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_action_check() {
+        let input = "As 2 carrot checks\n";
+        let expected = Action {
+            player_name: String::from("As 2 carrot"),
+            action: ActionType::Check,
+            is_all_in: false,
+        };
+        let (_, actual) = Action::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
 }
