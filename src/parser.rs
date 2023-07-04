@@ -620,6 +620,27 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_seats() {
+        let input = "Seat 1: WinterSound (20000, 0.45€ bounty)\nSeat 2: Player Two (18744)\n";
+        let expected = vec![
+            Seat {
+                seat_number: 1,
+                player_name: String::from("WinterSound"),
+                stack: Stack::Chips(20000),
+                bounty: Some(0.45),
+            },
+            Seat {
+                seat_number: 2,
+                player_name: String::from("Player Two"),
+                stack: Stack::Chips(18744),
+                bounty: None,
+            },
+        ];
+        let (_, actual) = parse_seats(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn test_parse_post_type_sb() {
         let input = "small blind 250\n";
         let expected = PostType::SmallBlind(AmountType::Chips(250));
