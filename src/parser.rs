@@ -1,8 +1,8 @@
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while};
-use nom::character::complete::{alpha1, anychar, char, line_ending, not_line_ending, u32};
+use nom::character::complete::{alpha1, anychar, char, line_ending, not_line_ending};
 use nom::combinator::{map, opt, rest};
-use nom::multi::many_till;
+use nom::multi::{many1, many_till};
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
@@ -27,7 +27,7 @@ impl TournamentInfo {
             separated_pair(buyin_parser, tag(" + "), rake_parser),
         );
 
-        let level_parser = preceded(tag("level: "), u32);
+        let level_parser = preceded(tag("level: "), nom::character::complete::u32);
 
         let (input, (name, _, (buy_in, rake), _, level)) = (
             name_parser,
@@ -171,8 +171,8 @@ impl HandInfo {
 fn parse_table_name_tournament(input: &str) -> IResult<&str, TableName> {
     let (input, (name, tournament_id, table_id)) = tuple((
         terminated(take_while(|c| c != '('), tag("(")),
-        terminated(u32, tag(")#")),
-        u32,
+        terminated(nom::character::complete::u32, tag(")#")),
+        nom::character::complete::u32,
     ))
     .parse(input)?;
     Ok((
@@ -235,10 +235,10 @@ impl TableInfo {
         let (input, (table_name, _, max_players, currency, _, button, _)) = tuple((
             preceded(tag("Table: "), TableName::parse),
             tag(" "),
-            terminated(u32, tag("-max ")),
+            terminated(nom::character::complete::u32, tag("-max ")),
             delimited(tag("("), MoneyType::parse, tag(")")),
             tag(" "),
-            preceded(tag("Seat #"), u32),
+            preceded(tag("Seat #"), nom::character::complete::u32),
             rest,
         ))
         .parse(input)?;
@@ -262,7 +262,7 @@ enum Stack {
 
 impl Stack {
     fn parse(input: &str) -> IResult<&str, Stack> {
-        let stack_chips = map(u32, Stack::Chips);
+        let stack_chips = map(nom::character::complete::u32, Stack::Chips);
         let stack_money = map(terminated(float, tag("€")), Stack::Money);
         let (input, stack) = alt((stack_money, stack_chips)).parse(input)?;
         Ok((input, stack))
@@ -285,9 +285,9 @@ impl Seat {
             opt(preceded(tag(", "), terminated(float, tag("€ bounty")))),
         ));
         let (input, (seat_number, _, player_name, _, (stack, bounty))) = tuple((
-            preceded(tag("Seat "), u32),
+            preceded(tag("Seat "), nom::character::complete::u32),
             tag(": "),
-            take_while(|c| c != ' '),
+            take_until(" ("),
             tag(" "),
             delimited(tag("("), stack_bounty, tag(")")),
         ))
@@ -304,6 +304,11 @@ impl Seat {
     }
 }
 
+fn parse_seats(input: &str) -> IResult<&str, Vec<Seat>> {
+    let (input, seats) = many1(terminated(Seat::parse, line_ending)).parse(input)?;
+    Ok((input, seats))
+}
+
 #[derive(Debug, PartialEq)]
 enum AmountType {
     Chips(u32),
@@ -312,7 +317,7 @@ enum AmountType {
 
 impl AmountType {
     fn parse(input: &str) -> IResult<&str, AmountType> {
-        let amount_chips = map(u32, AmountType::Chips);
+        let amount_chips = map(nom::character::complete::u32, AmountType::Chips);
         let amount_money = map(terminated(float, tag("€")), AmountType::Money);
         let (input, amount) = alt((amount_money, amount_chips)).parse(input)?;
         Ok((input, amount))
@@ -400,6 +405,111 @@ impl Action {
                 player_name: player_name_vec.into_iter().collect(),
                 action: action_type,
                 is_all_in: false,
+            },
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Rank {
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King,
+    Ace,
+}
+
+impl Rank {
+    fn parse(input: &str) -> IResult<&str, Rank> {
+        let (input, rank) = alt((
+            map(tag("2"), |_| Rank::Two),
+            map(tag("3"), |_| Rank::Three),
+            map(tag("4"), |_| Rank::Four),
+            map(tag("5"), |_| Rank::Five),
+            map(tag("6"), |_| Rank::Six),
+            map(tag("7"), |_| Rank::Seven),
+            map(tag("8"), |_| Rank::Eight),
+            map(tag("9"), |_| Rank::Nine),
+            map(tag("T"), |_| Rank::Ten),
+            map(tag("J"), |_| Rank::Jack),
+            map(tag("Q"), |_| Rank::Queen),
+            map(tag("K"), |_| Rank::King),
+            map(tag("A"), |_| Rank::Ace),
+        ))(input)?;
+        Ok((input, rank))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Suit {
+    Spades,
+    Hearts,
+    Diamonds,
+    Clubs,
+}
+
+impl Suit {
+    fn parse(input: &str) -> IResult<&str, Suit> {
+        let (input, suit) = alt((
+            map(tag("s"), |_| Suit::Spades),
+            map(tag("h"), |_| Suit::Hearts),
+            map(tag("d"), |_| Suit::Diamonds),
+            map(tag("c"), |_| Suit::Clubs),
+        ))(input)?;
+        Ok((input, suit))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Card {
+    rank: Rank,
+    suit: Suit,
+}
+
+impl Card {
+    fn parse(input: &str) -> IResult<&str, Card> {
+        let (input, (rank, suit)) = tuple((Rank::parse, Suit::parse))(input)?;
+        Ok((input, Card { rank, suit }))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct HoleCards {
+    card1: Card,
+    card2: Card,
+}
+
+impl HoleCards {
+    fn parse(input: &str) -> IResult<&str, HoleCards> {
+        let (input, (card1, card2)) = separated_pair(Card::parse, tag(" "), Card::parse)(input)?;
+        Ok((input, HoleCards { card1, card2 }))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct DealtToHero {
+    player_name: String,
+    hole_cards: HoleCards,
+}
+
+impl DealtToHero {
+    fn parse(input: &str) -> IResult<&str, DealtToHero> {
+        let hole_cards = delimited(tag(" ["), HoleCards::parse, tag("]"));
+        let (input, (player_name_vec, hole_cards)) =
+            preceded(tag("Dealt to "), many_till(anychar, hole_cards))(input)?;
+        Ok((
+            input,
+            DealtToHero {
+                player_name: player_name_vec.into_iter().collect(),
+                hole_cards,
             },
         ))
     }
@@ -608,10 +718,10 @@ mod tests {
 
     #[test]
     fn test_parse_seat_cashgame() {
-        let input = "Seat 3: WinterSound (0.50€)\n";
+        let input = "Seat 3: Winter Sound (0.50€)\n";
         let expected = Seat {
             seat_number: 3,
-            player_name: String::from("WinterSound"),
+            player_name: String::from("Winter Sound"),
             stack: Stack::Money(0.50),
             bounty: None,
         };
@@ -725,13 +835,33 @@ mod tests {
 
     #[test]
     fn test_parse_action_check() {
-        let input = "As 2 carrot checks\n";
+        let input = "Player One checks\n";
         let expected = Action {
-            player_name: String::from("As 2 carrot"),
+            player_name: String::from("Player One"),
             action: ActionType::Check,
             is_all_in: false,
         };
         let (_, actual) = Action::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_dealt_to() {
+        let input = "Dealt to Player One [Ks 9s]\n";
+        let expected = DealtToHero {
+            player_name: String::from("Player One"),
+            hole_cards: HoleCards {
+                card1: Card {
+                    rank: Rank::King,
+                    suit: Suit::Spades,
+                },
+                card2: Card {
+                    rank: Rank::Nine,
+                    suit: Suit::Spades,
+                },
+            },
+        };
+        let (_, actual) = DealtToHero::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
 }
