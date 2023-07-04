@@ -366,24 +366,27 @@ enum ActionType {
 
 impl ActionType {
     fn parse(input: &str) -> IResult<&str, ActionType> {
-        let (input, action_type) = alt((
-            map(preceded(tag("posts "), PostType::parse), ActionType::Post),
-            map(tag("checks"), |_| ActionType::Check),
-            map(tag("folds"), |_| ActionType::Fold),
-            map(preceded(tag("calls "), AmountType::parse), |x| {
-                ActionType::Call { amount: x }
-            }),
-            map(preceded(tag("bets "), AmountType::parse), |x| {
-                ActionType::Bet { amount: x }
-            }),
-            map(
-                preceded(
-                    tag("raises "),
-                    tuple((AmountType::parse, tag(" to "), AmountType::parse)),
+        let (input, action_type) = terminated(
+            alt((
+                map(preceded(tag("posts "), PostType::parse), ActionType::Post),
+                map(tag("checks"), |_| ActionType::Check),
+                map(tag("folds"), |_| ActionType::Fold),
+                map(preceded(tag("calls "), AmountType::parse), |x| {
+                    ActionType::Call { amount: x }
+                }),
+                map(preceded(tag("bets "), AmountType::parse), |x| {
+                    ActionType::Bet { amount: x }
+                }),
+                map(
+                    preceded(
+                        tag("raises "),
+                        tuple((AmountType::parse, tag(" to "), AmountType::parse)),
+                    ),
+                    |(to_call, _, amount)| ActionType::Raise { to_call, amount },
                 ),
-                |(to_call, _, amount)| ActionType::Raise { to_call, amount },
-            ),
-        ))(input)?;
+            )),
+            tag("\n"),
+        )(input)?;
         Ok((input, action_type))
     }
 }
@@ -515,6 +518,43 @@ impl DealtToHero {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum StreetType {
+    Preflop,
+    Flop,
+    Turn,
+    River,
+}
+
+#[derive(Debug, PartialEq)]
+struct Street {
+    street_type: StreetType,
+    actions: Vec<Action>,
+}
+
+impl Street {
+    fn parse(input: &str) -> IResult<&str, Street> {
+        let street_type = alt((
+            map(tag("*** FLOP ***"), |_| StreetType::Flop),
+            map(tag("*** TURN ***"), |_| StreetType::Turn),
+            map(tag("**** RIVER ***"), |_| StreetType::River),
+        ));
+
+        let (input, (street_type, _, _, (actions, _))) = tuple((
+            street_type,
+            take_until("\n"),
+            line_ending,
+            many_till(Action::parse, tag("***")),
+        ))(input)?;
+        Ok((
+            input,
+            Street {
+                street_type,
+                actions,
+            },
+        ))
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -846,6 +886,21 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_action_raises() {
+        let input = "Player One raises 500 to 1000\n";
+        let expected = Action {
+            player_name: String::from("Player One"),
+            action: ActionType::Raise {
+                to_call: AmountType::Chips(500),
+                amount: AmountType::Chips(1000),
+            },
+            is_all_in: false,
+        };
+        let (_, actual) = Action::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn test_parse_dealt_to() {
         let input = "Dealt to Player One [Ks 9s]\n";
         let expected = DealtToHero {
@@ -862,6 +917,34 @@ mod tests {
             },
         };
         let (_, actual) = DealtToHero::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_street() {
+        let input =
+            "*** FLOP *** [8s 7h 4h]\nPlayer One raises 500 to 1000\nPlayer Two calls 1000\n***";
+        let expected = Street {
+            street_type: StreetType::Flop,
+            actions: vec![
+                Action {
+                    player_name: String::from("Player One"),
+                    action: ActionType::Raise {
+                        to_call: AmountType::Chips(500),
+                        amount: AmountType::Chips(1000),
+                    },
+                    is_all_in: false,
+                },
+                Action {
+                    player_name: String::from("Player Two"),
+                    action: ActionType::Call {
+                        amount: AmountType::Chips(1000),
+                    },
+                    is_all_in: false,
+                },
+            ],
+        };
+        let (_, actual) = Street::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
 }
