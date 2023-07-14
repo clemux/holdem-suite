@@ -449,6 +449,30 @@ impl Rank {
         ))(input)?;
         Ok((input, rank))
     }
+
+    fn parse2(input: &str) -> IResult<&str, Rank> {
+        let (input, rank) = alt((
+            map(tag("2"), |_| Rank::Two),
+            map(tag("3"), |_| Rank::Three),
+            map(tag("4"), |_| Rank::Four),
+            map(tag("5"), |_| Rank::Five),
+            map(tag("6"), |_| Rank::Six),
+            map(tag("7"), |_| Rank::Seven),
+            map(tag("8"), |_| Rank::Eight),
+            map(tag("9"), |_| Rank::Nine),
+            map(tag("Tens"), |_| Rank::Ten),
+            map(tag("Ten"), |_| Rank::Ten),
+            map(tag("Jacks"), |_| Rank::Jack),
+            map(tag("Jack"), |_| Rank::Jack),
+            map(tag("Queens"), |_| Rank::Queen),
+            map(tag("Queen"), |_| Rank::Queen),
+            map(tag("Kings"), |_| Rank::King),
+            map(tag("King"), |_| Rank::King),
+            map(tag("Aces"), |_| Rank::Ace),
+            map(tag("Ace"), |_| Rank::Ace),
+        ))(input)?;
+        Ok((input, rank))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -579,23 +603,66 @@ enum SummaryResult {
 }
 
 #[derive(Debug, PartialEq)]
-enum ResultCards {
+enum HandCategory {
     HighCard(Rank),
     Pair(Rank),
     TwoPair(Rank, Rank),
     ThreeOfAKind(Rank),
     Straight(Rank),
-    Flush(Suit),
+    Flush(Rank),
     FullHouse(Rank, Rank),
     FourOfAKind(Rank),
     StraightFlush(Rank),
 }
 
-// impl ResultCards {
-//     fn parse(input: &str) -> IResult<&str, ResultCards> {
-//
-//     }
-// }
+impl HandCategory {
+    fn parse(input: &str) -> IResult<&str, HandCategory> {
+        let high_card = preceded(
+            tag("High card : "),
+            map(Rank::parse2, HandCategory::HighCard),
+        );
+        let pair = preceded(tag("One pair : "), map(Rank::parse2, HandCategory::Pair));
+
+        let two_pairs = preceded(
+            tag("Two pairs : "),
+            map(
+                separated_pair(Rank::parse2, tag(" and "), Rank::parse2),
+                |(rank1, rank2)| HandCategory::TwoPair(rank1, rank2),
+            ),
+        );
+
+        let three_of_a_kind = preceded(
+            tag("Trips of "),
+            map(Rank::parse2, HandCategory::ThreeOfAKind),
+        );
+
+        let four_of_a_kind = preceded(
+            tag("Four of a kind : "),
+            map(Rank::parse2, HandCategory::FourOfAKind),
+        );
+
+        let straight = preceded(tag("Straight "), map(Rank::parse2, HandCategory::Straight));
+
+        let flush = preceded(tag("Flush "), map(Rank::parse2, HandCategory::Flush));
+
+        let straight_flush = preceded(
+            tag("Straight flush "),
+            map(Rank::parse2, HandCategory::StraightFlush),
+        );
+
+        let (input, result_cards) = alt((
+            high_card,
+            pair,
+            two_pairs,
+            three_of_a_kind,
+            four_of_a_kind,
+            straight,
+            flush,
+            straight_flush,
+        ))(input)?;
+        Ok((input, result_cards))
+    }
+}
 
 #[derive(Debug, PartialEq)]
 struct SummaryPlayer {
@@ -603,6 +670,7 @@ struct SummaryPlayer {
     seat: u32,
     hole_cards: Option<HoleCards>,
     result: SummaryResult,
+    hand_category: Option<HandCategory>,
 }
 
 impl SummaryPlayer {
@@ -619,12 +687,14 @@ impl SummaryPlayer {
             opt(position),
             opt(showed),
             result,
-            opt(terminated(tag(" with"), take_until("\n"))),
+            opt(preceded(tag(" with "), HandCategory::parse)),
+            take_until("\n"),
+            tag("\n"),
         ));
 
         let winner_seat = preceded(tag("Seat "), nom::character::complete::u32);
         let winner_name_vec = preceded(tag(": "), many_till(anychar, position_show_result));
-        let (input, (winner_seat, (winner_name_vec, (_, showed, result, _)))) =
+        let (input, (winner_seat, (winner_name_vec, (_, showed, result, hand_category, _, _)))) =
             tuple((winner_seat, winner_name_vec))(input)?;
         Ok((
             input,
@@ -633,6 +703,7 @@ impl SummaryPlayer {
                 seat: winner_seat,
                 hole_cards: showed,
                 result: result,
+                hand_category,
             },
         ))
     }
@@ -1096,13 +1167,45 @@ mod tests {
         assert_eq!(expected, actual);
     }
 
-    // #[test]
-    // fn test_parse_result_cards() {
-    //     let input = "High card : Ace";
-    //     let expected = ResultCards::HighCard(Rank::Ace);
-    //     let (_, actual) = ResultCards::parse(input).unwrap();
-    //     assert_eq!(expected, actual);
-    // }
+    #[test]
+    fn test_parse_hand_category_high() {
+        let input = "High card : Ace";
+        let expected = HandCategory::HighCard(Rank::Ace);
+        let (_, actual) = HandCategory::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hand_category_pair() {
+        let input = "One pair : Aces";
+        let expected = HandCategory::Pair(Rank::Ace);
+        let (_, actual) = HandCategory::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hand_category_two_pair() {
+        let input = "Two pairs : Queens and 2";
+        let expected = HandCategory::TwoPair(Rank::Queen, Rank::Two);
+        let (_, actual) = HandCategory::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hand_category_flush() {
+        let input = "Flush Jack high";
+        let expected = HandCategory::Flush(Rank::Jack);
+        let (_, actual) = HandCategory::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hand_category_straight() {
+        let input = "Straight Ten high";
+        let expected = HandCategory::Straight(Rank::Ten);
+        let (_, actual) = HandCategory::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
 
     #[test]
     fn test_parse_summary_player() {
@@ -1112,6 +1215,7 @@ mod tests {
             name: String::from("Alexarango"),
             result: SummaryResult::Won(AmountType::Money(0.31)),
             hole_cards: None,
+            hand_category: None,
         };
         let (_, actual) = SummaryPlayer::parse(input).unwrap();
         assert_eq!(expected, actual);
@@ -1119,21 +1223,47 @@ mod tests {
 
     #[test]
     fn test_parse_summary_player_showdown() {
-        let input = "Seat 6: Alexarango (button) showed [Ks 9s] and won 0.31€\n";
+        let input =
+            "Seat 6: Alexarango (button) showed [8d Td] and won 0.36€ with Straight Ten high\n";
         let expected = SummaryPlayer {
             seat: 6,
             name: String::from("Alexarango"),
-            result: SummaryResult::Won(AmountType::Money(0.31)),
+            result: SummaryResult::Won(AmountType::Money(0.36)),
             hole_cards: Some(HoleCards {
                 card1: Card {
-                    rank: Rank::King,
-                    suit: Suit::Spades,
+                    rank: Rank::Eight,
+                    suit: Suit::Diamonds,
                 },
                 card2: Card {
-                    rank: Rank::Nine,
+                    rank: Rank::Ten,
+                    suit: Suit::Diamonds,
+                },
+            }),
+            hand_category: Some(HandCategory::Straight(Rank::Ten)),
+        };
+        let (_, actual) = SummaryPlayer::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_player_showdown_lost() {
+        let input =
+            "Seat 3: Player Two showed [Qd As] and won 0.36€ with Two pairs : Queens and 2\n";
+        let expected = SummaryPlayer {
+            seat: 3,
+            name: String::from("Player Two"),
+            result: SummaryResult::Won(AmountType::Money(0.36)),
+            hole_cards: Some(HoleCards {
+                card1: Card {
+                    rank: Rank::Queen,
+                    suit: Suit::Diamonds,
+                },
+                card2: Card {
+                    rank: Rank::Ace,
                     suit: Suit::Spades,
                 },
             }),
+            hand_category: Some(HandCategory::TwoPair(Rank::Queen, Rank::Two)),
         };
         let (_, actual) = SummaryPlayer::parse(input).unwrap();
         assert_eq!(expected, actual);
@@ -1150,6 +1280,7 @@ mod tests {
                 name: String::from("Player One"),
                 result: SummaryResult::Won(AmountType::Chips(2670)),
                 hole_cards: None,
+                hand_category: None,
             }],
             board: None,
         };
@@ -1169,6 +1300,7 @@ mod tests {
                 name: String::from("Player One"),
                 result: SummaryResult::Won(AmountType::Money(0.79)),
                 hole_cards: None,
+                hand_category: None,
             }],
             board: Some(Board {
                 cards: vec![
@@ -1211,6 +1343,7 @@ mod tests {
                 name: String::from("Player One"),
                 result: SummaryResult::Won(AmountType::Chips(2670)),
                 hole_cards: None,
+                hand_category: None,
             }],
             board: Some(Board {
                 cards: vec![
@@ -1247,28 +1380,47 @@ mod tests {
             "Total pot 0.30€ | Rake 0.03€\n",
             "Board: [3s Ks Qh 2s 2c]\n",
             "Seat 2: Player One (big blind) showed [9c Kd] and won ",
-            "0.30€ with One pair : Kings and 2\n",
+            "0.30€ with One pair : Kings\n",
             "Seat 3: Player Two showed [Qd As] and lost with Two pairs : Queens and 2\n\n"
         );
 
         let expected = Summary {
             pot: AmountType::Money(0.30),
             rake: Some(AmountType::Money(0.03)),
-            players: vec![SummaryPlayer {
-                seat: 2,
-                name: String::from("Player One"),
-                result: SummaryResult::Won(AmountType::Money(0.30)),
-                hole_cards: Some(HoleCards {
-                    card1: Card {
-                        rank: Rank::Nine,
-                        suit: Suit::Clubs,
-                    },
-                    card2: Card {
-                        rank: Rank::King,
-                        suit: Suit::Diamonds,
-                    },
-                }),
-            }],
+            players: vec![
+                SummaryPlayer {
+                    seat: 2,
+                    name: String::from("Player One"),
+                    result: SummaryResult::Won(AmountType::Money(0.30)),
+                    hole_cards: Some(HoleCards {
+                        card1: Card {
+                            rank: Rank::Nine,
+                            suit: Suit::Clubs,
+                        },
+                        card2: Card {
+                            rank: Rank::King,
+                            suit: Suit::Diamonds,
+                        },
+                    }),
+                    hand_category: Some(HandCategory::Pair(Rank::King)),
+                },
+                SummaryPlayer {
+                    seat: 3,
+                    name: String::from("Player Two"),
+                    result: SummaryResult::Lost,
+                    hole_cards: Some(HoleCards {
+                        card1: Card {
+                            rank: Rank::Queen,
+                            suit: Suit::Diamonds,
+                        },
+                        card2: Card {
+                            rank: Rank::Ace,
+                            suit: Suit::Spades,
+                        },
+                    }),
+                    hand_category: Some(HandCategory::TwoPair(Rank::Queen, Rank::Two)),
+                },
+            ],
             board: Some(Board {
                 cards: vec![
                     Card {
@@ -1296,10 +1448,5 @@ mod tests {
         };
         let (_, actual) = Summary::parse(input).unwrap();
         assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_parse_summary_two_winners() {
-        let input = "Total pot 2670 | No rake\nBoard: [8s 7h 4h 3s 2h]\nSeat 5: TaBrEaMoI showed [Qs Ad] and won 0.06€ with High card : Ace\nSeat 6: Josemuerde (button) showed [Qh Ac] and won 0.06€ with High card : Ace\n";
     }
 }
