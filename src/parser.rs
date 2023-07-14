@@ -2,7 +2,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while};
 use nom::character::complete::{alpha1, anychar, char, line_ending, not_line_ending};
 use nom::combinator::{map, opt, rest};
-use nom::multi::{many1, many_till};
+use nom::multi::{many1, many_till, separated_list0};
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
@@ -555,6 +555,123 @@ impl Street {
         ))
     }
 }
+
+#[derive(Debug, PartialEq)]
+struct Board {
+    cards: Vec<Card>,
+}
+
+impl Board {
+    fn parse(input: &str) -> IResult<&str, Board> {
+        let (input, (_, cards, _)) = tuple((
+            tag("Board: ["),
+            terminated(separated_list0(tag(" "), Card::parse), tag("]")),
+            line_ending,
+        ))(input)?;
+        Ok((input, Board { cards }))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum SummaryResult {
+    Won(AmountType),
+    Lost,
+}
+
+#[derive(Debug, PartialEq)]
+enum ResultCards {
+    HighCard(Rank),
+    Pair(Rank),
+    TwoPair(Rank, Rank),
+    ThreeOfAKind(Rank),
+    Straight(Rank),
+    Flush(Suit),
+    FullHouse(Rank, Rank),
+    FourOfAKind(Rank),
+    StraightFlush(Rank),
+}
+
+// impl ResultCards {
+//     fn parse(input: &str) -> IResult<&str, ResultCards> {
+//
+//     }
+// }
+
+#[derive(Debug, PartialEq)]
+struct SummaryPlayer {
+    name: String,
+    seat: u32,
+    hole_cards: Option<HoleCards>,
+    result: SummaryResult,
+}
+
+impl SummaryPlayer {
+    fn parse(input: &str) -> IResult<&str, SummaryPlayer> {
+        let position = delimited(tag(" ("), take_until(")"), tag(")"));
+        let showed = delimited(tag(" showed ["), HoleCards::parse, tag("] and"));
+        let result = alt((
+            map(preceded(tag(" won "), AmountType::parse), |amount| {
+                SummaryResult::Won(amount)
+            }),
+            map(tag(" lost"), |_| SummaryResult::Lost),
+        ));
+        let position_show_result = tuple((
+            opt(position),
+            opt(showed),
+            result,
+            opt(terminated(tag(" with"), take_until("\n"))),
+        ));
+
+        let winner_seat = preceded(tag("Seat "), nom::character::complete::u32);
+        let winner_name_vec = preceded(tag(": "), many_till(anychar, position_show_result));
+        let (input, (winner_seat, (winner_name_vec, (_, showed, result, _)))) =
+            tuple((winner_seat, winner_name_vec))(input)?;
+        Ok((
+            input,
+            SummaryPlayer {
+                name: winner_name_vec.into_iter().collect(),
+                seat: winner_seat,
+                hole_cards: showed,
+                result: result,
+            },
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Summary {
+    pot: AmountType,
+    rake: Option<AmountType>,
+    players: Vec<SummaryPlayer>,
+    board: Option<Board>,
+}
+
+impl Summary {
+    fn parse(input: &str) -> IResult<&str, Summary> {
+        let pot_amount = delimited(tag("Total pot "), AmountType::parse, tag(" | "));
+        let rake = alt((
+            map(preceded(tag("Rake "), AmountType::parse), Some),
+            map(tag("No rake"), |_| None),
+        ));
+        let (input, (pot_amount, rake, _, board, (players, _))) = tuple((
+            pot_amount,
+            rake,
+            tag("\n"),
+            opt(Board::parse),
+            many_till(SummaryPlayer::parse, tag("\n")),
+        ))(input)?;
+        Ok((
+            input,
+            Summary {
+                pot: pot_amount,
+                rake: rake,
+                players,
+                board,
+            },
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -946,5 +1063,243 @@ mod tests {
         };
         let (_, actual) = Street::parse(input).unwrap();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_board() {
+        let input = "Board: [8s 7h 4h 3s 2h]\n";
+        let expected = Board {
+            cards: vec![
+                Card {
+                    rank: Rank::Eight,
+                    suit: Suit::Spades,
+                },
+                Card {
+                    rank: Rank::Seven,
+                    suit: Suit::Hearts,
+                },
+                Card {
+                    rank: Rank::Four,
+                    suit: Suit::Hearts,
+                },
+                Card {
+                    rank: Rank::Three,
+                    suit: Suit::Spades,
+                },
+                Card {
+                    rank: Rank::Two,
+                    suit: Suit::Hearts,
+                },
+            ],
+        };
+        let (_, actual) = Board::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    // #[test]
+    // fn test_parse_result_cards() {
+    //     let input = "High card : Ace";
+    //     let expected = ResultCards::HighCard(Rank::Ace);
+    //     let (_, actual) = ResultCards::parse(input).unwrap();
+    //     assert_eq!(expected, actual);
+    // }
+
+    #[test]
+    fn test_parse_summary_player() {
+        let input = "Seat 6: Alexarango (button) won 0.31€\n";
+        let expected = SummaryPlayer {
+            seat: 6,
+            name: String::from("Alexarango"),
+            result: SummaryResult::Won(AmountType::Money(0.31)),
+            hole_cards: None,
+        };
+        let (_, actual) = SummaryPlayer::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_player_showdown() {
+        let input = "Seat 6: Alexarango (button) showed [Ks 9s] and won 0.31€\n";
+        let expected = SummaryPlayer {
+            seat: 6,
+            name: String::from("Alexarango"),
+            result: SummaryResult::Won(AmountType::Money(0.31)),
+            hole_cards: Some(HoleCards {
+                card1: Card {
+                    rank: Rank::King,
+                    suit: Suit::Spades,
+                },
+                card2: Card {
+                    rank: Rank::Nine,
+                    suit: Suit::Spades,
+                },
+            }),
+        };
+        let (_, actual) = SummaryPlayer::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_no_flop_no_rake() {
+        let input = "Total pot 2670 | No rake\nSeat 3: Player One won 2670\n\n";
+        let expected = Summary {
+            pot: AmountType::Chips(2670),
+            rake: None,
+            players: vec![SummaryPlayer {
+                seat: 3,
+                name: String::from("Player One"),
+                result: SummaryResult::Won(AmountType::Chips(2670)),
+                hole_cards: None,
+            }],
+            board: None,
+        };
+        let (_, actual) = Summary::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_with_rake() {
+        let input =
+            "Total pot 0.79€ | Rake 0.01€\nBoard: [8c 5h Ts Kd Td]\nSeat 3: Player One won 0.79€\n\n";
+        let expected = Summary {
+            pot: AmountType::Money(0.79),
+            rake: Some(AmountType::Money(0.01)),
+            players: vec![SummaryPlayer {
+                seat: 3,
+                name: String::from("Player One"),
+                result: SummaryResult::Won(AmountType::Money(0.79)),
+                hole_cards: None,
+            }],
+            board: Some(Board {
+                cards: vec![
+                    Card {
+                        rank: Rank::Eight,
+                        suit: Suit::Clubs,
+                    },
+                    Card {
+                        rank: Rank::Five,
+                        suit: Suit::Hearts,
+                    },
+                    Card {
+                        rank: Rank::Ten,
+                        suit: Suit::Spades,
+                    },
+                    Card {
+                        rank: Rank::King,
+                        suit: Suit::Diamonds,
+                    },
+                    Card {
+                        rank: Rank::Ten,
+                        suit: Suit::Diamonds,
+                    },
+                ],
+            }),
+        };
+        let (_, actual) = Summary::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_with_board() {
+        let input =
+            "Total pot 2670 | No rake\nBoard: [8s 7h 4h 3s 2h]\nSeat 3: Player One won 2670\n\n";
+        let expected = Summary {
+            pot: AmountType::Chips(2670),
+            rake: None,
+            players: vec![SummaryPlayer {
+                seat: 3,
+                name: String::from("Player One"),
+                result: SummaryResult::Won(AmountType::Chips(2670)),
+                hole_cards: None,
+            }],
+            board: Some(Board {
+                cards: vec![
+                    Card {
+                        rank: Rank::Eight,
+                        suit: Suit::Spades,
+                    },
+                    Card {
+                        rank: Rank::Seven,
+                        suit: Suit::Hearts,
+                    },
+                    Card {
+                        rank: Rank::Four,
+                        suit: Suit::Hearts,
+                    },
+                    Card {
+                        rank: Rank::Three,
+                        suit: Suit::Spades,
+                    },
+                    Card {
+                        rank: Rank::Two,
+                        suit: Suit::Hearts,
+                    },
+                ],
+            }),
+        };
+        let (_, actual) = Summary::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_with_showdown() {
+        let input = concat!(
+            "Total pot 0.30€ | Rake 0.03€\n",
+            "Board: [3s Ks Qh 2s 2c]\n",
+            "Seat 2: Player One (big blind) showed [9c Kd] and won ",
+            "0.30€ with One pair : Kings and 2\n",
+            "Seat 3: Player Two showed [Qd As] and lost with Two pairs : Queens and 2\n\n"
+        );
+
+        let expected = Summary {
+            pot: AmountType::Money(0.30),
+            rake: Some(AmountType::Money(0.03)),
+            players: vec![SummaryPlayer {
+                seat: 2,
+                name: String::from("Player One"),
+                result: SummaryResult::Won(AmountType::Money(0.30)),
+                hole_cards: Some(HoleCards {
+                    card1: Card {
+                        rank: Rank::Nine,
+                        suit: Suit::Clubs,
+                    },
+                    card2: Card {
+                        rank: Rank::King,
+                        suit: Suit::Diamonds,
+                    },
+                }),
+            }],
+            board: Some(Board {
+                cards: vec![
+                    Card {
+                        rank: Rank::Three,
+                        suit: Suit::Spades,
+                    },
+                    Card {
+                        rank: Rank::King,
+                        suit: Suit::Spades,
+                    },
+                    Card {
+                        rank: Rank::Queen,
+                        suit: Suit::Hearts,
+                    },
+                    Card {
+                        rank: Rank::Two,
+                        suit: Suit::Spades,
+                    },
+                    Card {
+                        rank: Rank::Two,
+                        suit: Suit::Clubs,
+                    },
+                ],
+            }),
+        };
+        let (_, actual) = Summary::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_summary_two_winners() {
+        let input = "Total pot 2670 | No rake\nBoard: [8s 7h 4h 3s 2h]\nSeat 5: TaBrEaMoI showed [Qs Ad] and won 0.06€ with High card : Ace\nSeat 6: Josemuerde (button) showed [Qh Ac] and won 0.06€ with High card : Ace\n";
     }
 }
