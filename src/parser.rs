@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until, take_while};
 use nom::character::complete::{alpha1, anychar, char, line_ending, not_line_ending};
-use nom::combinator::{map, opt, rest};
+use nom::combinator::{map, opt};
 use nom::multi::{many1, many_till, separated_list0};
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
@@ -232,14 +232,15 @@ struct TableInfo {
 
 impl TableInfo {
     fn parse(input: &str) -> IResult<&str, TableInfo> {
-        let (input, (table_name, _, max_players, currency, _, button, _)) = tuple((
+        let (input, (table_name, _, max_players, currency, _, button, _, _)) = tuple((
             preceded(tag("Table: "), TableName::parse),
             tag(" "),
             terminated(nom::character::complete::u32, tag("-max ")),
             delimited(tag("("), MoneyType::parse, tag(")")),
             tag(" "),
             preceded(tag("Seat #"), nom::character::complete::u32),
-            rest,
+            take_until("\n"),
+            tag("\n"),
         ))
         .parse(input)?;
         Ok((
@@ -362,6 +363,7 @@ enum ActionType {
         to_call: AmountType,
         amount: AmountType,
     },
+    Collect,
 }
 
 impl ActionType {
@@ -371,6 +373,9 @@ impl ActionType {
                 map(preceded(tag("posts "), PostType::parse), ActionType::Post),
                 map(tag("checks"), |_| ActionType::Check),
                 map(tag("folds"), |_| ActionType::Fold),
+                map(preceded(tag("collected"), take_until("\n")), |_| {
+                    ActionType::Collect
+                }),
                 map(preceded(tag("calls "), AmountType::parse), |x| {
                     ActionType::Call { amount: x }
                 }),
@@ -531,7 +536,7 @@ impl DealtToHero {
     fn parse(input: &str) -> IResult<&str, DealtToHero> {
         let hole_cards = delimited(tag(" ["), HoleCards::parse, tag("]"));
         let (input, (player_name_vec, hole_cards)) =
-            preceded(tag("Dealt to "), many_till(anychar, hole_cards))(input)?;
+            delimited(tag("Dealt to "), many_till(anychar, hole_cards), tag("\n"))(input)?;
         Ok((
             input,
             DealtToHero {
@@ -559,16 +564,17 @@ struct Street {
 impl Street {
     fn parse(input: &str) -> IResult<&str, Street> {
         let street_type = alt((
+            map(tag("*** PRE-FLOP ***"), |_| StreetType::Preflop),
             map(tag("*** FLOP ***"), |_| StreetType::Flop),
             map(tag("*** TURN ***"), |_| StreetType::Turn),
             map(tag("**** RIVER ***"), |_| StreetType::River),
         ));
 
-        let (input, (street_type, _, _, (actions, _))) = tuple((
+        let (input, (street_type, _, _, actions)) = tuple((
             street_type,
             take_until("\n"),
             line_ending,
-            many_till(Action::parse, tag("***")),
+            many1(Action::parse),
         ))(input)?;
         Ok((
             input,
@@ -610,7 +616,7 @@ enum HandCategory {
     ThreeOfAKind(Rank),
     Straight(Rank),
     Flush(Rank),
-    FullHouse(Rank, Rank),
+    Full(Rank, Rank),
     FourOfAKind(Rank),
     StraightFlush(Rank),
 }
@@ -641,6 +647,14 @@ impl HandCategory {
             map(Rank::parse2, HandCategory::FourOfAKind),
         );
 
+        let full = preceded(
+            tag("Full of "),
+            map(
+                separated_pair(Rank::parse2, tag(" and "), Rank::parse2),
+                |(rank1, rank2)| HandCategory::Full(rank1, rank2),
+            ),
+        );
+
         let straight = preceded(tag("Straight "), map(Rank::parse2, HandCategory::Straight));
 
         let flush = preceded(tag("Flush "), map(Rank::parse2, HandCategory::Flush));
@@ -656,6 +670,7 @@ impl HandCategory {
             two_pairs,
             three_of_a_kind,
             four_of_a_kind,
+            full,
             straight,
             flush,
             straight_flush,
@@ -738,6 +753,41 @@ impl Summary {
                 rake: rake,
                 players,
                 board,
+            },
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Hand {
+    hand_info: HandInfo,
+    table_info: TableInfo,
+    seats: Vec<Seat>,
+    dealt_cards: DealtToHero,
+    streets: Vec<Street>,
+    summary: Summary,
+}
+
+impl Hand {
+    fn parse(input: &str) -> IResult<&str, Hand> {
+        let (input, (hand_info, table_info, seats, _, dealt_cards, (streets, summary))) =
+            tuple((
+                HandInfo::parse,
+                TableInfo::parse,
+                parse_seats,
+                take_until("Dealt to"),
+                DealtToHero::parse,
+                many_till(Street::parse, Summary::parse),
+            ))(input)?;
+        Ok((
+            input,
+            Hand {
+                hand_info,
+                table_info,
+                seats,
+                dealt_cards,
+                summary,
+                streets,
             },
         ))
     }
@@ -979,6 +1029,59 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_seats_6() {
+        let input = concat!(
+            "Seat 1: Anonymous1 (23940, 0.45€ bounty)\n",
+            "Seat 2: Anonymous 2 (14388, 0.45€ bounty)\n",
+            "Seat 3: Anonymous 3 (20410, 0.45€ bounty)\n",
+            "Seat 4: Anonymous4 (15425, 0.45€ bounty)\n",
+            "Seat 5: WinterSound (14285, 0.45€ bounty)\n",
+            "Seat 6: Anonymous5 (109973, 1€ bounty)\n",
+            "*** ANTE/BLINDS ***\n",
+        );
+        let expected = vec![
+            Seat {
+                seat_number: 1,
+                player_name: String::from("Anonymous1"),
+                stack: Stack::Chips(23940),
+                bounty: Some(0.45),
+            },
+            Seat {
+                seat_number: 2,
+                player_name: String::from("Anonymous 2"),
+                stack: Stack::Chips(14388),
+                bounty: Some(0.45),
+            },
+            Seat {
+                seat_number: 3,
+                player_name: String::from("Anonymous 3"),
+                stack: Stack::Chips(20410),
+                bounty: Some(0.45),
+            },
+            Seat {
+                seat_number: 4,
+                player_name: String::from("Anonymous4"),
+                stack: Stack::Chips(15425),
+                bounty: Some(0.45),
+            },
+            Seat {
+                seat_number: 5,
+                player_name: String::from("WinterSound"),
+                stack: Stack::Chips(14285),
+                bounty: Some(0.45),
+            },
+            Seat {
+                seat_number: 6,
+                player_name: String::from("Anonymous5"),
+                stack: Stack::Chips(109973),
+                bounty: Some(1.0),
+            },
+        ];
+        let (_, actual) = parse_seats(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn test_parse_post_type_sb() {
         let input = "small blind 250\n";
         let expected = PostType::SmallBlind(AmountType::Chips(250));
@@ -1195,6 +1298,14 @@ mod tests {
     fn test_parse_hand_category_flush() {
         let input = "Flush Jack high";
         let expected = HandCategory::Flush(Rank::Jack);
+        let (_, actual) = HandCategory::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hand_category_full() {
+        let input = "Full of 6 and 4";
+        let expected = HandCategory::Full(Rank::Six, Rank::Four);
         let (_, actual) = HandCategory::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1447,6 +1558,176 @@ mod tests {
             }),
         };
         let (_, actual) = Summary::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hand() {
+        let input = concat!(
+            "Winamax Poker - Tournament \"WESTERN\" buyIn: 0.90€ + 0.10€ level: 7 - ",
+            "HandId: #2815488303912976462-17-1684698755 - Holdem no limit (70/300/600)",
+            " - 2023/05/21 19:52:35 UTC\n",
+            "Table: 'WESTERN(1684698755)#004' 6-max (real money) Seat #3 is the button\n",
+            "Seat 1: Anonymous1 (23940, 0.45€ bounty)\n",
+            "Seat 2: Anonymous 2 (14388, 0.45€ bounty)\n",
+            "Seat 3: Anonymous 3 (20410, 0.45€ bounty)\n",
+            "Seat 4: Anonymous4 (15425, 0.45€ bounty)\n",
+            "Seat 5: WinterSound (14285, 0.45€ bounty)\n",
+            "Seat 6: Anonymous5 (109973, 1€ bounty)\n",
+            "*** ANTE/BLINDS ***\n",
+            "Anonymous5 posts ante 70\n",
+            "Anonymous1 posts ante 70\n",
+            "Anonymous 2 posts ante 70\n",
+            "Anonymous 3 posts ante 70\n",
+            "Anonymous4 posts ante 70\n",
+            "WinterSound posts ante 70\n",
+            "Anonymous5 posts small blind 300\n",
+            "Anonymous1 posts big blind 60\n",
+            "Dealt to WinterSound [6s Qh]\n",
+            "*** PRE-FLOP ***\n",
+            "Anonymous 2 folds\n",
+            "Anonymous 3 raises 750 to 1350\n",
+            "Anonymous4 folds\n",
+            "WinterSound folds\n",
+            "Anonymous5 folds\n",
+            "Anonymous1 folds\n",
+            "Anonymous 3 collected 2670 from pot",
+            "*** SUMMARY ***\n",
+            "Total pot 2670 | No rake\n",
+            "Seat 3: Anonymous 3 won 2670\n\n"
+        );
+
+        let expected = Hand {
+            hand_info: HandInfo {
+                game_info: GameInfo::Tournament(TournamentInfo {
+                    name: String::from("WESTERN"),
+                    buy_in: 0.90,
+                    rake: 0.10,
+                    level: 7,
+                }),
+                hand_id: String::from("2815488303912976462-17-1684698755"),
+                poker_type: PokerType::HoldemNoLimit,
+                blinds: Blinds {
+                    ante: Some(70.0),
+                    small_blind: 300.0,
+                    big_blind: 600.0,
+                },
+                datetime: String::from("2023/05/21 19:52:35 UTC"),
+            },
+            table_info: TableInfo {
+                table_name: TableName::Tournament(String::from("WESTERN"), 1684698755, 4),
+                max_players: 6,
+                currency: MoneyType::RealMoney,
+                button: 3,
+            },
+            seats: vec![
+                Seat {
+                    seat_number: 1,
+                    player_name: String::from("Anonymous1"),
+                    stack: Stack::Chips(23940),
+                    bounty: Some(0.45),
+                },
+                Seat {
+                    seat_number: 2,
+                    player_name: String::from("Anonymous 2"),
+                    stack: Stack::Chips(14388),
+                    bounty: Some(0.45),
+                },
+                Seat {
+                    seat_number: 3,
+                    player_name: String::from("Anonymous 3"),
+                    stack: Stack::Chips(20410),
+                    bounty: Some(0.45),
+                },
+                Seat {
+                    seat_number: 4,
+                    player_name: String::from("Anonymous4"),
+                    stack: Stack::Chips(15425),
+                    bounty: Some(0.45),
+                },
+                Seat {
+                    seat_number: 5,
+                    player_name: String::from("WinterSound"),
+                    stack: Stack::Chips(14285),
+                    bounty: Some(0.45),
+                },
+                Seat {
+                    seat_number: 6,
+                    player_name: String::from("Anonymous5"),
+                    stack: Stack::Chips(109973),
+                    bounty: Some(1.0),
+                },
+            ],
+            dealt_cards: DealtToHero {
+                player_name: String::from("WinterSound"),
+                hole_cards: HoleCards {
+                    card1: Card {
+                        rank: Rank::Six,
+                        suit: Suit::Spades,
+                    },
+                    card2: Card {
+                        rank: Rank::Queen,
+                        suit: Suit::Hearts,
+                    },
+                },
+            },
+            streets: vec![Street {
+                street_type: StreetType::Preflop,
+                actions: vec![
+                    Action {
+                        player_name: String::from("Anonymous 2"),
+                        action: ActionType::Fold,
+                        is_all_in: false,
+                    },
+                    Action {
+                        player_name: String::from("Anonymous 3"),
+                        action: ActionType::Raise {
+                            to_call: AmountType::Chips(750),
+                            amount: AmountType::Chips(1350),
+                        },
+                        is_all_in: false,
+                    },
+                    Action {
+                        player_name: String::from("Anonymous4"),
+                        action: ActionType::Fold,
+                        is_all_in: false,
+                    },
+                    Action {
+                        player_name: String::from("WinterSound"),
+                        action: ActionType::Fold,
+                        is_all_in: false,
+                    },
+                    Action {
+                        player_name: String::from("Anonymous5"),
+                        action: ActionType::Fold,
+                        is_all_in: false,
+                    },
+                    Action {
+                        player_name: String::from("Anonymous1"),
+                        action: ActionType::Fold,
+                        is_all_in: false,
+                    },
+                    Action {
+                        player_name: String::from("Anonymous 3"),
+                        action: ActionType::Collect,
+                        is_all_in: false,
+                    },
+                ],
+            }],
+            summary: Summary {
+                pot: AmountType::Chips(2670),
+                rake: None,
+                players: vec![SummaryPlayer {
+                    name: String::from("Anonymous 3"),
+                    seat: 3,
+                    hole_cards: None,
+                    result: SummaryResult::Won(AmountType::Chips(2670)),
+                    hand_category: None,
+                }],
+                board: None,
+            },
+        };
+        let (_, actual) = Hand::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
 }
