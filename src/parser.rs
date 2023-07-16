@@ -1,8 +1,8 @@
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until, take_while};
-use nom::character::complete::{alpha1, anychar, char, line_ending, not_line_ending};
-use nom::combinator::{map, opt};
-use nom::multi::{many1, many_till, separated_list0};
+use nom::bytes::complete::{tag, take_till, take_until, take_while};
+use nom::character::complete::{alpha1, anychar, char, line_ending, none_of, not_line_ending};
+use nom::combinator::{eof, map, opt};
+use nom::multi::{many1, many_till, separated_list0, separated_list1};
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
@@ -87,7 +87,6 @@ fn parse_blind(input: &str) -> IResult<&str, f32> {
     Ok((input, blind))
 }
 
-// possible inputs are "60/250/500" or "250/500" or "0.01€/0.02€". use parse_blind
 impl Blinds {
     fn parse(input: &str) -> IResult<&str, Blinds> {
         let small_big_pair = separated_pair(parse_blind, tag("/"), parse_blind);
@@ -118,7 +117,6 @@ enum PokerType {
     HoldemNoLimit,
 }
 
-// implement PokerType::parse for this input: "Holdem no limit" which is PokerType::HoldemNoLimit
 impl PokerType {
     fn parse(input: &str) -> IResult<&str, PokerType> {
         let (input, _) = tag("Holdem no limit").parse(input)?;
@@ -135,9 +133,6 @@ struct HandInfo {
     datetime: String,
 }
 
-// implement HandInfo parse for this input:
-// Winamax Poker - Tournament "WESTERN" buyIn: 0.90€ + 0.10€ level: 6 - HandId: #2815488303912976462-15-1684698584 - Holdem no limit (60/250/500) - 2023/05/21 19:49:44 UTC
-// use GameInfo::parse, Blinds::parse, PokerType::parse
 impl HandInfo {
     fn parse(input: &str) -> IResult<&str, HandInfo> {
         let hand_id = preceded(tag("HandId: #"), take_while(|c: char| c != ' '));
@@ -167,7 +162,6 @@ impl HandInfo {
     }
 }
 
-// input: WESTERN(655531954)#077
 fn parse_table_name_tournament(input: &str) -> IResult<&str, TableName> {
     let (input, (name, tournament_id, table_id)) = tuple((
         terminated(take_while(|c| c != '('), tag("(")),
@@ -239,8 +233,8 @@ impl TableInfo {
             delimited(tag("("), MoneyType::parse, tag(")")),
             tag(" "),
             preceded(tag("Seat #"), nom::character::complete::u32),
-            take_until("\n"),
-            tag("\n"),
+            tag(" is the button"),
+            line_ending,
         ))
         .parse(input)?;
         Ok((
@@ -278,7 +272,6 @@ struct Seat {
     bounty: Option<f32>,
 }
 
-// input: Seat 5: WinterSound (20000, 0.45€ bounty)
 impl Seat {
     fn parse(input: &str) -> IResult<&str, Seat> {
         let stack_bounty = tuple((
@@ -364,34 +357,38 @@ enum ActionType {
         amount: AmountType,
     },
     Collect,
+    Shows,
 }
 
 impl ActionType {
     fn parse(input: &str) -> IResult<&str, ActionType> {
-        let (input, action_type) = terminated(
-            alt((
-                map(preceded(tag("posts "), PostType::parse), ActionType::Post),
-                map(tag("checks"), |_| ActionType::Check),
-                map(tag("folds"), |_| ActionType::Fold),
-                map(preceded(tag("collected"), take_until("\n")), |_| {
-                    ActionType::Collect
-                }),
-                map(preceded(tag("calls "), AmountType::parse), |x| {
-                    ActionType::Call { amount: x }
-                }),
-                map(preceded(tag("bets "), AmountType::parse), |x| {
-                    ActionType::Bet { amount: x }
-                }),
-                map(
-                    preceded(
-                        tag("raises "),
-                        tuple((AmountType::parse, tag(" to "), AmountType::parse)),
-                    ),
-                    |(to_call, _, amount)| ActionType::Raise { to_call, amount },
+        let (input, action_type) = alt((
+            map(preceded(tag("posts "), PostType::parse), ActionType::Post),
+            map(tag("checks"), |_| ActionType::Check),
+            map(tag("folds"), |_| ActionType::Fold),
+            // TODO: handle "all-in"
+            map(preceded(tag("calls "), AmountType::parse), |x| {
+                ActionType::Call { amount: x }
+            }),
+            map(preceded(tag("bets "), AmountType::parse), |x| {
+                ActionType::Bet { amount: x }
+            }),
+            map(
+                preceded(
+                    tag("raises "),
+                    tuple((AmountType::parse, tag(" to "), AmountType::parse)),
                 ),
-            )),
-            tag("\n"),
-        )(input)?;
+                |(to_call, _, amount)| ActionType::Raise { to_call, amount },
+            ),
+            // "collected" and "shows" are not actual actions, we don't care about the rest
+            // of the line
+            map(preceded(tag("collected"), take_until("\n")), |_| {
+                ActionType::Collect
+            }),
+            map(preceded(tag("shows"), take_until("\n")), |_| {
+                ActionType::Shows
+            }),
+        ))(input)?;
         Ok((input, action_type))
     }
 }
@@ -406,7 +403,8 @@ struct Action {
 impl Action {
     fn parse(input: &str) -> IResult<&str, Action> {
         let (input, (player_name_vec, action_type)) =
-            many_till(anychar, preceded(tag(" "), ActionType::parse))(input)?;
+            // anychar would work too, but we want to fail on newlines for robustness
+            many_till(none_of("\n"), preceded(tag(" "), ActionType::parse))(input)?;
         Ok((
             input,
             Action {
@@ -553,6 +551,7 @@ enum StreetType {
     Flop,
     Turn,
     River,
+    Showdown,
 }
 
 #[derive(Debug, PartialEq)]
@@ -567,14 +566,15 @@ impl Street {
             map(tag("*** PRE-FLOP ***"), |_| StreetType::Preflop),
             map(tag("*** FLOP ***"), |_| StreetType::Flop),
             map(tag("*** TURN ***"), |_| StreetType::Turn),
-            map(tag("**** RIVER ***"), |_| StreetType::River),
+            map(tag("*** RIVER ***"), |_| StreetType::River),
+            map(tag("*** SHOW DOWN ***"), |_| StreetType::Showdown),
         ));
 
-        let (input, (street_type, _, _, actions)) = tuple((
+        let (input, (street_type, _, actions, _)) = tuple((
             street_type,
-            take_until("\n"),
+            many_till(anychar, line_ending), // ignore partial boards
+            separated_list1(line_ending, Action::parse),
             line_ending,
-            many1(Action::parse),
         ))(input)?;
         Ok((
             input,
@@ -655,7 +655,11 @@ impl HandCategory {
             ),
         );
 
-        let straight = preceded(tag("Straight "), map(Rank::parse2, HandCategory::Straight));
+        let straight = delimited(
+            tag("Straight "),
+            map(Rank::parse2, HandCategory::Straight),
+            tag(" high"),
+        );
 
         let flush = preceded(tag("Flush "), map(Rank::parse2, HandCategory::Flush));
 
@@ -703,13 +707,12 @@ impl SummaryPlayer {
             opt(showed),
             result,
             opt(preceded(tag(" with "), HandCategory::parse)),
-            take_until("\n"),
-            tag("\n"),
+            alt((tag("\n"), eof)),
         ));
 
         let winner_seat = preceded(tag("Seat "), nom::character::complete::u32);
         let winner_name_vec = preceded(tag(": "), many_till(anychar, position_show_result));
-        let (input, (winner_seat, (winner_name_vec, (_, showed, result, hand_category, _, _)))) =
+        let (input, (winner_seat, (winner_name_vec, (_, showed, result, hand_category, _)))) =
             tuple((winner_seat, winner_name_vec))(input)?;
         Ok((
             input,
@@ -717,7 +720,7 @@ impl SummaryPlayer {
                 name: winner_name_vec.into_iter().collect(),
                 seat: winner_seat,
                 hole_cards: showed,
-                result: result,
+                result,
                 hand_category,
             },
         ))
@@ -739,18 +742,18 @@ impl Summary {
             map(preceded(tag("Rake "), AmountType::parse), Some),
             map(tag("No rake"), |_| None),
         ));
-        let (input, (pot_amount, rake, _, board, (players, _))) = tuple((
+        let (input, (pot_amount, rake, _, board, players)) = tuple((
             pot_amount,
             rake,
-            tag("\n"),
+            line_ending,
             opt(Board::parse),
-            many_till(SummaryPlayer::parse, tag("\n")),
+            many1(SummaryPlayer::parse),
         ))(input)?;
         Ok((
             input,
             Summary {
                 pot: pot_amount,
-                rake: rake,
+                rake,
                 players,
                 board,
             },
@@ -759,7 +762,7 @@ impl Summary {
 }
 
 #[derive(Debug, PartialEq)]
-struct Hand {
+pub struct Hand {
     hand_info: HandInfo,
     table_info: TableInfo,
     seats: Vec<Seat>,
@@ -769,15 +772,20 @@ struct Hand {
 }
 
 impl Hand {
-    fn parse(input: &str) -> IResult<&str, Hand> {
-        let (input, (hand_info, table_info, seats, _, dealt_cards, (streets, summary))) =
+    pub fn parse(input: &str) -> IResult<&str, Hand> {
+        let (input, (_, hand_info, table_info, seats, _, dealt_cards, (streets, _), summary)) =
             tuple((
+                take_till(|c: char| c.is_alphabetic()),
                 HandInfo::parse,
                 TableInfo::parse,
                 parse_seats,
                 take_until("Dealt to"),
                 DealtToHero::parse,
-                many_till(Street::parse, Summary::parse),
+                many_till(
+                    Street::parse,
+                    terminated(tag("*** SUMMARY ***"), line_ending),
+                ),
+                Summary::parse,
             ))(input)?;
         Ok((
             input,
@@ -795,6 +803,8 @@ impl Hand {
 
 #[cfg(test)]
 mod tests {
+    use nom::multi::separated_list1;
+
     use super::*;
 
     #[test]
@@ -1214,7 +1224,7 @@ mod tests {
     #[test]
     fn test_parse_street() {
         let input =
-            "*** FLOP *** [8s 7h 4h]\nPlayer One raises 500 to 1000\nPlayer Two calls 1000\n***";
+            "*** FLOP *** [8s 7h 4h]\nPlayer One raises 500 to 1000\nPlayer Two calls 1000\n";
         let expected = Street {
             street_type: StreetType::Flop,
             actions: vec![
@@ -1320,7 +1330,7 @@ mod tests {
 
     #[test]
     fn test_parse_summary_player() {
-        let input = "Seat 6: Alexarango (button) won 0.31€\n";
+        let input = "Seat 6: Alexarango (button) won 0.31€";
         let expected = SummaryPlayer {
             seat: 6,
             name: String::from("Alexarango"),
@@ -1402,7 +1412,7 @@ mod tests {
     #[test]
     fn test_parse_summary_with_rake() {
         let input =
-            "Total pot 0.79€ | Rake 0.01€\nBoard: [8c 5h Ts Kd Td]\nSeat 3: Player One won 0.79€\n\n";
+            "Total pot 0.79€ | Rake 0.01€\nBoard: [8c 5h Ts Kd Td]\nSeat 3: Player One won 0.79€";
         let expected = Summary {
             pot: AmountType::Money(0.79),
             rake: Some(AmountType::Money(0.01)),
@@ -1591,7 +1601,7 @@ mod tests {
             "WinterSound folds\n",
             "Anonymous5 folds\n",
             "Anonymous1 folds\n",
-            "Anonymous 3 collected 2670 from pot",
+            "Anonymous 3 collected 2670 from pot\n",
             "*** SUMMARY ***\n",
             "Total pot 2670 | No rake\n",
             "Seat 3: Anonymous 3 won 2670\n\n"
@@ -1729,5 +1739,12 @@ mod tests {
         };
         let (_, actual) = Hand::parse(input).unwrap();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_hands() {
+        let data = include_str!("../samples/sample1.txt");
+        let (_, hands) = separated_list1(tag("\n"), Hand::parse)(data).unwrap();
+        assert_eq!(hands.len(), 3);
     }
 }
