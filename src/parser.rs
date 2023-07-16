@@ -533,8 +533,11 @@ struct DealtToHero {
 impl DealtToHero {
     fn parse(input: &str) -> IResult<&str, DealtToHero> {
         let hole_cards = delimited(tag(" ["), HoleCards::parse, tag("]"));
-        let (input, (player_name_vec, hole_cards)) =
-            delimited(tag("Dealt to "), many_till(anychar, hole_cards), tag("\n"))(input)?;
+        let (input, (player_name_vec, hole_cards)) = delimited(
+            tag("Dealt to "),
+            many_till(anychar, hole_cards),
+            line_ending,
+        )(input)?;
         Ok((
             input,
             DealtToHero {
@@ -707,7 +710,7 @@ impl SummaryPlayer {
             opt(showed),
             result,
             opt(preceded(tag(" with "), HandCategory::parse)),
-            alt((tag("\n"), eof)),
+            alt((line_ending, eof)),
         ));
 
         let winner_seat = preceded(tag("Seat "), nom::character::complete::u32);
@@ -1744,7 +1747,7 @@ mod tests {
     #[test]
     fn test_parse_hands() {
         let data = include_str!("../samples/sample1.txt");
-        let (_, hands) = separated_list1(tag("\n"), Hand::parse)(data).unwrap();
+        let (_, hands) = separated_list1(line_ending, Hand::parse)(data).unwrap();
         assert_eq!(hands.len(), 3);
     }
 }
