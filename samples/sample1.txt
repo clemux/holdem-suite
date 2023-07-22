@@ -1,0 +1,126 @@
+Winamax Poker - Tournament "WESTERN" buyIn: 0.90€ + 0.10€ level: 6 - HandId: #2815488303912976462-15-1684698584 - Holdem no limit (60/250/500) - 2023/05/21 19:49:44 UTC
+Table: 'WESTERN(655531954)#077' 6-max (real money) Seat #3 is the button
+Seat 1: Anonymous 1 (20535, 0.45€ bounty)
+Seat 2: Anonymous 2 (17188, 0.45€ bounty)
+Seat 3: Anonymous 3 (20530, 0.45€ bounty)
+Seat 4: Anonymous 4 (15795, 0.45€ bounty)
+Seat 5: WinterSound (20000, 0.45€ bounty)
+Seat 6: Anonymous 5 (104373, 1€ bounty)
+*** ANTE/BLINDS ***
+Anonymous 4 posts ante 60
+WinterSound posts ante 60
+Anonymous 1 posts ante 60
+Anonymous 2 posts ante 60
+Anonymous 3 posts ante 60
+Anonymous 5 posts ante 60
+Anonymous 4 posts small blind 250
+WinterSound posts big blind 500
+Dealt to WinterSound [Td Qc]
+*** PRE-FLOP ***
+Anonymous 5 folds
+Anonymous 1 calls 500
+Anonymous 2 folds
+Anonymous 3 folds
+Anonymous 4 folds
+WinterSound checks
+*** FLOP *** [Ad Qs Jh]
+WinterSound checks
+Anonymous 1 bets 805
+WinterSound calls 805
+*** TURN *** [Ad Qs Jh][9d]
+WinterSound checks
+Anonymous 1 bets 1610
+WinterSound calls 1610
+*** RIVER *** [Ad Qs Jh 9d][Ts]
+WinterSound checks
+Anonymous 1 checks
+*** SHOW DOWN ***
+WinterSound shows [Td Qc] (Two pairs : Queens and Tens)
+Anonymous 1 shows [Ah Tc] (Two pairs : Aces and Tens)
+Anonymous 1 collected 6440 from pot
+*** SUMMARY ***
+Total pot 6440 | No rake
+Board: [Ad Qs Jh 9d Ts]
+Seat 1: Anonymous 1 showed [Ah Tc] and won 6440 with Two pairs : Aces and Tens
+Seat 5: WinterSound (big blind) showed [Td Qc] and lost with Two pairs : Queens and Tens
+
+Winamax Poker - Tournament "WESTERN" buyIn: 0.90€ + 0.10€ level: 6 - HandId: #2815488303912976462-16-1684698652 - Holdem no limit (60/250/500) - 2023/05/21 19:50:52 UTC
+Table: 'WESTERN(655531954)#077' 6-max (real money) Seat #4 is the button
+Seat 1: Anonymous 1 (24000, 0.45€ bounty)
+Seat 2: Anonymous 2 (17128, 0.45€ bounty)
+Seat 3: Anonymous 3 (20470, 0.45€ bounty)
+Seat 4: Anonymous 4 (15485, 0.45€ bounty)
+Seat 5: WinterSound (17025, 0.45€ bounty)
+Seat 6: Anonymous 5 (104313, 1€ bounty)
+*** ANTE/BLINDS ***
+WinterSound posts ante 60
+Anonymous 5 posts ante 60
+Anonymous 1 posts ante 60
+Anonymous 2 posts ante 60
+Anonymous 3 posts ante 60
+Anonymous 4 posts ante 60
+WinterSound posts small blind 250
+Anonymous 5 posts big blind 500
+Dealt to WinterSound [5s Ah]
+*** PRE-FLOP ***
+Anonymous 1 folds
+Anonymous 2 raises 500 to 1000
+Anonymous 3 folds
+Anonymous 4 folds
+WinterSound calls 750
+Anonymous 5 calls 500
+*** FLOP *** [Js 8c 4s]
+WinterSound checks
+Anonymous 5 checks
+Anonymous 2 bets 1680
+WinterSound calls 1680
+Anonymous 5 calls 1680
+*** TURN *** [Js 8c 4s][Qh]
+WinterSound checks
+Anonymous 5 checks
+Anonymous 2 checks
+*** RIVER *** [Js 8c 4s Qh][9d]
+WinterSound checks
+Anonymous 5 checks
+Anonymous 2 checks
+*** SHOW DOWN ***
+Anonymous 2 shows [As 9s] (One pair : 9)
+WinterSound shows [5s Ah] (High card : Ace)
+Anonymous 5 shows [Ks Ts] (Straight King high)
+Anonymous 5 collected 8400 from pot
+*** SUMMARY ***
+Total pot 8400 | No rake
+Board: [Js 8c 4s Qh 9d]
+Seat 2: Anonymous 2 showed [As 9s] and lost with One pair : 9
+Seat 5: WinterSound (small blind) showed [5s Ah] and lost with High card : Ace
+Seat 6: Anonymous 5 (big blind) showed [Ks Ts] and won 8400 with Straight King high
+
+Winamax Poker - Tournament "WESTERN" buyIn: 0.90€ + 0.10€ level: 7 - HandId: #2815488303912976462-17-1684698755 - Holdem no limit (70/300/600) - 2023/05/21 19:52:35 UTC
+Table: 'WESTERN(655531954)#077' 6-max (real money) Seat #5 is the button
+Seat 1: Anonymous 1 (23940, 0.45€ bounty)
+Seat 2: Anonymous 2 (14388, 0.45€ bounty)
+Seat 3: Anonymous 3 (20410, 0.45€ bounty)
+Seat 4: Anonymous 4 (15425, 0.45€ bounty)
+Seat 5: WinterSound (14285, 0.45€ bounty)
+Seat 6: Anonymous 5 (109973, 1€ bounty)
+*** ANTE/BLINDS ***
+Anonymous 5 posts ante 70
+Anonymous 1 posts ante 70
+Anonymous 2 posts ante 70
+Anonymous 3 posts ante 70
+Anonymous 4 posts ante 70
+WinterSound posts ante 70
+Anonymous 5 posts small blind 300
+Anonymous 1 posts big blind 600
+Dealt to WinterSound [6s Qh]
+*** PRE-FLOP ***
+Anonymous 2 folds
+Anonymous 3 raises 750 to 1350
+Anonymous 4 folds
+WinterSound folds
+Anonymous 5 folds
+Anonymous 1 folds
+Anonymous 3 collected 2670 from pot
+*** SUMMARY ***
+Total pot 2670 | No rake
+Seat 3: Anonymous 3 won 2670
