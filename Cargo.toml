@@ -2,7 +2,7 @@
 
 members = [
     "parser",
-    "gui-qt",
+    "gui/src-tauri"
 ]
 
 [workspace.dependencies]
