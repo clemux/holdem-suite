@@ -2,34 +2,37 @@
 import {ref} from "vue";
 import {invoke} from "@tauri-apps/api/tauri";
 
-const summaries = ref([]);
+const columns = [
+  {
+    name: 'id',
+    required: true,
+    label: 'ID',
+    align: 'left',
+    field: row => row.id,
+    format: val => `${val}`,
+    sortable: true
+  },
+  { name: 'name', align: 'center', label: 'Tournament', field: 'name', sortable: true },
+  { name: 'finish_place', label: 'Finish place', field: 'finish_place', sortable: true },
+]
+
+const rows = ref([]);
 
 async function loadSummaries() {
-  summaries.value = await invoke("load_summaries", {});
-  console.log(summaries);
+  rows.value = await invoke("load_summaries", {});
 }
 </script>
 
 <template>
   <div class="container">
+    <q-table
+      title="Tournament Summaries"
+      :rows="rows"
+      :columns="columns"
+      row-key="name"
+    />
     <form class="row" @submit.prevent="loadSummaries">
       <button type="submit">Load</button>
     </form>
-    <table class="border-collapse border border-slate-300 table-auto">
-      <thead>
-        <tr>
-          <th class="border border-collapse border-slate-300">Id</th>
-          <th class="border border-collapse border-slate-300">Name</th>
-          <th class="border border-collapse border-slate-300">Finish Place</th>
-        </tr>
-      </thead>
-      <tbody>
-      <tr v-for="summary in summaries">
-        <td class="border border-collapse border-slate-300" >{{ summary.id }}</td>
-        <td class="border border-collapse border-slate-300">{{ summary.name }}</td>
-        <td class="border border-collapse border-slate-300">{{ summary.finish_place }}</td>
-      </tr>
-      </tbody>
-    </table>
   </div>
 </template>

@@ -12,9 +12,7 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 fn load_summaries() -> Vec<Summary> {
-    let results = get_summaries();
-    println!("load_summaries: {:?}", results);
-    results
+    get_summaries()
 }
 
 fn main() {
