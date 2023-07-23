@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import {ref} from "vue";
 import {invoke} from "@tauri-apps/api/tauri";
+import {QTableColumn} from "quasar";
 
-const columns = [
+const columns: QTableColumn[] = [
   {
     name: 'id',
     required: true,
     label: 'ID',
     align: 'left',
-    field: row => row.id,
-    format: val => `${val}`,
+    field: 'id',
     sortable: true
   },
   { name: 'name', align: 'center', label: 'Tournament', field: 'name', sortable: true },
@@ -20,6 +20,7 @@ const rows = ref([]);
 
 async function loadSummaries() {
   rows.value = await invoke("load_summaries", {});
+  console.log("LOADING");
 }
 </script>
 
