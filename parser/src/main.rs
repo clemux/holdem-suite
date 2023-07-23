@@ -2,7 +2,7 @@ use std::fs;
 
 use clap::Parser;
 
-use holdem_suite::{establish_connection, insert_summary, parser, summary_parser};
+use holdem_suite_parser::{establish_connection, insert_summary, parser, summary_parser};
 
 #[derive(Parser)]
 struct Cli {

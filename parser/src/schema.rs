@@ -2,8 +2,8 @@
 
 diesel::table! {
     summaries (id) {
-        id -> Nullable<Integer>,
-        name -> Nullable<Text>,
-        finish_place -> Nullable<Integer>,
+        id -> Integer,
+        name -> Text,
+        finish_place -> Integer,
     }
 }

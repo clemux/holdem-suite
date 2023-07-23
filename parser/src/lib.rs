@@ -1,5 +1,7 @@
 use std::env;
 
+use self::schema::summaries::dsl::*;
+use crate::models::Summary;
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 
@@ -25,4 +27,13 @@ pub fn insert_summary(conn: &mut SqliteConnection, summary: summary_parser::Tour
         .on_conflict_do_nothing()
         .execute(conn)
         .expect("Error saving new summary");
+}
+
+pub fn get_summaries() -> Vec<Summary> {
+    let connection = &mut establish_connection();
+    let results = summaries
+        .select(models::Summary::as_select())
+        .load(connection)
+        .expect("Error loading summaries");
+    results
 }
