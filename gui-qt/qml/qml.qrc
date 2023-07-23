@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>SummaryView.qml</file>
+        <file>Test.qml</file>
+    </qresource>
+</RCC>

@@ -1,5 +1,5 @@
 [package]
-name = "holdem-suite-gui"
+name = "holdem-suite-gui-qt"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,6 +10,7 @@ diesel = { version = "2.1.0", features = ["sqlite"] }
 cxx = "1.0.83"
 cxx-qt = "0.5"
 cxx-qt-lib = "0.5"
+holdem-suite-parser = { path= "../parser" }
 
 [build-dependencies]
 cxx-qt-build = "0.5"
