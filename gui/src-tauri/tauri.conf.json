@@ -37,7 +37,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "gui-exp",
+        "title": "Holdem Suite Tracker",
         "width": 800,
         "height": 600,
       "visible": false
