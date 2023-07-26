@@ -4,6 +4,3 @@ members = [
     "parser",
     "gui/src-tauri"
 ]
-
-[workspace.dependencies]
-parser = { path = "parser" }
