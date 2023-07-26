@@ -10,8 +10,8 @@ pub mod parser;
 pub mod schema;
 pub mod summary_parser;
 
-pub fn establish_connection() -> SqliteConnection {
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+pub fn establish_connection(database_url: &str) -> SqliteConnection {
+    println!("Connecting to {}", database_url);
     SqliteConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
@@ -29,11 +29,11 @@ pub fn insert_summary(conn: &mut SqliteConnection, summary: summary_parser::Tour
         .expect("Error saving new summary");
 }
 
-pub fn get_summaries() -> Vec<Summary> {
-    let connection = &mut establish_connection();
+pub fn get_summaries(url: &str) -> Vec<Summary> {
+    let mut connection = establish_connection(url);
     let results = summaries
         .select(models::Summary::as_select())
-        .load(connection)
+        .load(&mut connection)
         .expect("Error loading summaries");
     results
 }
