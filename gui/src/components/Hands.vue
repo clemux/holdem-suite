@@ -15,6 +15,7 @@ const columns: QTableColumn[] = [
   { name: 'Card 1', align: 'center', label: 'Card 1', field: 'hole_card_1'},
   { name: 'Card 2', align: 'center', label: 'Card 2', field: 'hole_card_2'},
   { name: 'tournamentId', label: 'Tournament', field: 'tournament_id', sortable: true },
+  { name: 'datetime', label: 'Date', field: 'datetime', sortable: true}
 ]
 
 const rows = ref([]);

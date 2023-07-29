@@ -131,7 +131,7 @@ fn setup_app(app: &App, settings: Settings) -> Result<(), Box<dyn std::error::Er
 
 fn main() {
     let settings = Settings {
-        database_url: "sqlite:///home/clemux/dev/holdem-suite/parser/test.db",
+        database_url: "sqlite:///home/clemux/dev/holdem-suite/test.db",
         watch_folder: Path::new(
             "/home/clemux/.config/winamax/documents/accounts/WinterSound/history/",
         ),
