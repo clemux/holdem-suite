@@ -20,7 +20,6 @@ const rows = ref([]);
 
 async function loadSummaries() {
   rows.value = await invoke("load_summaries", {});
-  console.log("LOADING");
 }
 </script>
 
