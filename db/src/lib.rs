@@ -51,13 +51,13 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
         })
         .collect();
 
-    // for hand in &new_hands {
-    diesel::insert_into(schema::hands::table)
-        .values(new_hands)
-        .on_conflict_do_nothing()
-        .execute(conn)
-        .expect("Error saving new hands");
-    // }
+    for hand in &new_hands {
+        diesel::insert_into(schema::hands::table)
+            .values(hand)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .expect("Error saving new hands");
+    }
 }
 
 pub fn get_hands(url: &str) -> Vec<Hand> {
