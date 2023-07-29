@@ -6,9 +6,10 @@ use nom::multi::{many1, many_till, separated_list0, separated_list1};
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
-struct TournamentInfo {
+pub struct TournamentInfo {
     name: String,
     buy_in: f32,
     rake: f32,
@@ -51,7 +52,7 @@ impl TournamentInfo {
 }
 
 #[derive(Debug, PartialEq)]
-enum GameInfo {
+pub enum GameInfo {
     Tournament(TournamentInfo),
     CashGame,
     HoldUp,
@@ -76,7 +77,7 @@ impl GameInfo {
 }
 
 #[derive(Debug, PartialEq)]
-struct Blinds {
+pub struct Blinds {
     ante: Option<f32>,
     small_blind: f32,
     big_blind: f32,
@@ -113,7 +114,7 @@ impl Blinds {
 }
 
 #[derive(Debug, PartialEq)]
-enum PokerType {
+pub enum PokerType {
     HoldemNoLimit,
 }
 
@@ -125,12 +126,12 @@ impl PokerType {
 }
 
 #[derive(Debug, PartialEq)]
-struct HandInfo {
-    game_info: GameInfo,
-    hand_id: String,
-    poker_type: PokerType,
-    blinds: Blinds,
-    datetime: String,
+pub struct HandInfo {
+    pub game_info: GameInfo,
+    pub hand_id: String,
+    pub poker_type: PokerType,
+    pub blinds: Blinds,
+    pub datetime: String,
 }
 
 impl HandInfo {
@@ -176,7 +177,7 @@ fn parse_table_name_tournament(input: &str) -> IResult<&str, TableName> {
 }
 
 #[derive(Debug, PartialEq)]
-enum TableName {
+pub enum TableName {
     Tournament(String, u32, u32),
     CashGame(String),
 }
@@ -217,8 +218,8 @@ impl MoneyType {
 }
 
 #[derive(Debug, PartialEq)]
-struct TableInfo {
-    table_name: TableName,
+pub struct TableInfo {
+    pub table_name: TableName,
     max_players: u32,
     currency: MoneyType,
     button: u32,
@@ -265,7 +266,7 @@ impl Stack {
 }
 
 #[derive(Debug, PartialEq)]
-struct Seat {
+pub struct Seat {
     seat_number: u32,
     player_name: String,
     stack: Stack,
@@ -417,7 +418,7 @@ impl Action {
 }
 
 #[derive(Debug, PartialEq)]
-enum Rank {
+pub enum Rank {
     Two,
     Three,
     Four,
@@ -478,8 +479,32 @@ impl Rank {
     }
 }
 
+impl fmt::Display for Rank {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Rank::Two => "2",
+                Rank::Three => "3",
+                Rank::Four => "4",
+                Rank::Five => "5",
+                Rank::Six => "6",
+                Rank::Seven => "7",
+                Rank::Eight => "8",
+                Rank::Nine => "9",
+                Rank::Ten => "T",
+                Rank::Jack => "J",
+                Rank::Queen => "Q",
+                Rank::King => "K",
+                Rank::Ace => "A",
+            }
+        )
+    }
+}
+
 #[derive(Debug, PartialEq)]
-enum Suit {
+pub enum Suit {
     Spades,
     Hearts,
     Diamonds,
@@ -498,10 +523,25 @@ impl Suit {
     }
 }
 
+impl fmt::Display for Suit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Suit::Spades => "s",
+                Suit::Hearts => "h",
+                Suit::Diamonds => "d",
+                Suit::Clubs => "c",
+            }
+        )
+    }
+}
+
 #[derive(Debug, PartialEq)]
-struct Card {
-    rank: Rank,
-    suit: Suit,
+pub struct Card {
+    pub rank: Rank,
+    pub suit: Suit,
 }
 
 impl Card {
@@ -511,10 +551,16 @@ impl Card {
     }
 }
 
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.rank, self.suit)
+    }
+}
+
 #[derive(Debug, PartialEq)]
-struct HoleCards {
-    card1: Card,
-    card2: Card,
+pub struct HoleCards {
+    pub card1: Card,
+    pub card2: Card,
 }
 
 impl HoleCards {
@@ -525,9 +571,9 @@ impl HoleCards {
 }
 
 #[derive(Debug, PartialEq)]
-struct DealtToHero {
-    player_name: String,
-    hole_cards: HoleCards,
+pub struct DealtToHero {
+    pub player_name: String,
+    pub hole_cards: HoleCards,
 }
 
 impl DealtToHero {
@@ -558,7 +604,7 @@ enum StreetType {
 }
 
 #[derive(Debug, PartialEq)]
-struct Street {
+pub struct Street {
     street_type: StreetType,
     actions: Vec<Action>,
 }
@@ -731,7 +777,7 @@ impl SummaryPlayer {
 }
 
 #[derive(Debug, PartialEq)]
-struct Summary {
+pub struct Summary {
     pot: AmountType,
     rake: Option<AmountType>,
     players: Vec<SummaryPlayer>,
@@ -766,12 +812,12 @@ impl Summary {
 
 #[derive(Debug, PartialEq)]
 pub struct Hand {
-    hand_info: HandInfo,
-    table_info: TableInfo,
-    seats: Vec<Seat>,
-    dealt_cards: DealtToHero,
-    streets: Vec<Street>,
-    summary: Summary,
+    pub hand_info: HandInfo,
+    pub table_info: TableInfo,
+    pub seats: Vec<Seat>,
+    pub dealt_cards: DealtToHero,
+    pub streets: Vec<Street>,
+    pub summary: Summary,
 }
 
 impl Hand {
@@ -802,6 +848,11 @@ impl Hand {
             },
         ))
     }
+}
+
+pub fn parse_hands(input: &str) -> IResult<&str, Vec<Hand>> {
+    let result = separated_list1(line_ending, Hand::parse)(input);
+    result
 }
 
 #[cfg(test)]

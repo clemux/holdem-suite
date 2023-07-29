@@ -2,7 +2,10 @@ use std::fs;
 
 use clap::Parser;
 
-use holdem_suite_parser::{establish_connection, insert_summary, parser, summary_parser};
+use holdem_suite_parser::parser::parse_hands;
+use holdem_suite_parser::{
+    establish_connection, insert_hands, insert_summary, parser, summary_parser,
+};
 
 #[derive(Parser)]
 struct Cli {
@@ -23,8 +26,11 @@ fn main() {
             insert_summary(connection, summary);
         } else {
             let data = fs::read_to_string(path).expect("Unable to read file");
-            let hands = parser::Hand::parse(&data);
-            // println!("{}", hands.is_ok());
+            let parse_result = parse_hands(&data);
+            match parse_result {
+                Ok((_, hands)) => insert_hands(connection, hands),
+                Err(e) => println!("{}", e),
+            }
         }
     }
 }
