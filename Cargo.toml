@@ -1,6 +1,8 @@
 [workspace]
 
 members = [
+    "cli",
+    "db",
+    "gui/src-tauri",
     "parser",
-    "gui/src-tauri"
 ]

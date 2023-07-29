@@ -1,10 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use holdem_suite_db::{get_hands, get_summaries};
 use tauri::{CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
-use holdem_suite_parser::models::{Hand, Summary};
-use holdem_suite_parser::{get_hands, get_summaries};
+use holdem_suite_db::models::{Hand, Summary};
 
 struct Settings<'a> {
     database_url: &'a str,
@@ -20,15 +20,11 @@ fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
     get_hands(state.database_url)
 }
 
-// Create the command:
-// This command must be async so that it doesn't run on the main thread.
 #[tauri::command]
 async fn close_splashscreen(window: tauri::Window) {
-    // Close splashscreen
     if let Some(splashscreen) = window.get_window("splashscreen") {
         splashscreen.close().unwrap();
     }
-    // Show main window
     window.get_window("main").unwrap().show().unwrap();
 }
 
