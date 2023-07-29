@@ -1,12 +1,14 @@
+use std::fmt;
+
+use chrono::prelude::*;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till, take_until, take_while};
 use nom::character::complete::{alpha1, anychar, char, line_ending, none_of, not_line_ending};
-use nom::combinator::{eof, map, opt};
+use nom::combinator::{eof, map, map_res, opt};
 use nom::multi::{many1, many_till, separated_list0, separated_list1};
 use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
-use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub struct TournamentInfo {
@@ -131,7 +133,7 @@ pub struct HandInfo {
     pub hand_id: String,
     pub poker_type: PokerType,
     pub blinds: Blinds,
-    pub datetime: String,
+    pub datetime: DateTime<Utc>,
 }
 
 impl HandInfo {
@@ -147,7 +149,9 @@ impl HandInfo {
             char(' '),
             delimited(char('('), Blinds::parse, char(')')),
             tag(" - "),
-            datetime,
+            map_res(datetime, |s: &str| {
+                Utc.datetime_from_str(s, "%Y/%m/%d %H:%M:%S %Z")
+            }),
         )
             .parse(input)?;
         Ok((
@@ -157,7 +161,7 @@ impl HandInfo {
                 hand_id: hand_id.to_owned(),
                 poker_type,
                 blinds,
-                datetime: datetime.to_owned(),
+                datetime,
             },
         ))
     }
@@ -950,7 +954,8 @@ mod tests {
                 small_blind: 250.0,
                 big_blind: 500.0,
             },
-            datetime: String::from("2023/05/21 19:49:44 UTC"),
+            // datetime: String::from("2023/05/21 19:49:44 UTC"),
+            datetime: Utc.with_ymd_and_hms(2023, 5, 21, 19, 49, 44).unwrap(),
         };
         let (_, actual) = HandInfo::parse(input).unwrap();
         assert_eq!(expected, actual);
@@ -969,7 +974,7 @@ mod tests {
                 small_blind: 0.01,
                 big_blind: 0.02,
             },
-            datetime: String::from("2023/06/17 15:09:45 UTC"),
+            datetime: Utc.with_ymd_and_hms(2023, 6, 17, 15, 9, 45).unwrap(),
         };
         let (_, actual) = HandInfo::parse(input).unwrap();
         assert_eq!(expected, actual);
@@ -987,7 +992,7 @@ mod tests {
                 small_blind: 0.01,
                 big_blind: 0.02,
             },
-            datetime: String::from("2023/06/17 17:29:18 UTC"),
+            datetime: Utc.with_ymd_and_hms(2023, 6, 17, 17, 29, 18).unwrap(),
         };
 
         let (_, actual) = HandInfo::parse(input).unwrap();
@@ -1675,7 +1680,7 @@ mod tests {
                     small_blind: 300.0,
                     big_blind: 600.0,
                 },
-                datetime: String::from("2023/05/21 19:52:35 UTC"),
+                datetime: Utc.with_ymd_and_hms(2023, 5, 21, 19, 52, 35).unwrap(),
             },
             table_info: TableInfo {
                 table_name: TableName::Tournament(String::from("WESTERN"), 1684698755, 4),
