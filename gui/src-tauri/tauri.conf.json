@@ -34,14 +34,6 @@
       "csp": null
     },
     "windows": [
-      {
-        "fullscreen": false,
-        "resizable": true,
-        "title": "Holdem Suite Tracker",
-        "width": 800,
-        "height": 600,
-      "visible": false
-      },
      {
        "width": 400,
        "height": 200,

@@ -1,9 +1,9 @@
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 
-use crate::models::{NewHand, Summary};
-use crate::parser::Hand;
+use crate::models::{Hand, NewHand, Summary};
 
+use self::schema::hands::dsl::*;
 use self::schema::summaries::dsl::*;
 
 pub mod models;
@@ -39,16 +39,16 @@ pub fn get_summaries(url: &str) -> Vec<Summary> {
     results
 }
 
-pub fn insert_hands(conn: &mut SqliteConnection, hands: Vec<Hand>) {
-    let new_hands: Vec<NewHand> = hands
+pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
+    let new_hands: Vec<NewHand> = hands_vec
         .into_iter()
         .map(|h| NewHand {
             id: h.hand_info.hand_id,
             hole_card_1: h.dealt_cards.hole_cards.card1.to_string(),
             hole_card_2: h.dealt_cards.hole_cards.card2.to_string(),
             tournament_id: match h.table_info.table_name {
-                parser::TableName::Tournament(_, tournament_id, _) => {
-                    Some(Some(tournament_id as i32))
+                parser::TableName::Tournament(_, tournament_id_, _) => {
+                    Some(Some(tournament_id_ as i32))
                 }
                 _ => Some(None),
             },
@@ -62,4 +62,13 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands: Vec<Hand>) {
             .execute(conn)
             .expect("Error saving new hands");
     }
+}
+
+pub fn get_hands(url: &str) -> Vec<Hand> {
+    let mut connection = establish_connection(url);
+    let results = hands
+        .select(models::Hand::as_select())
+        .load(&mut connection)
+        .expect("Error loading hands");
+    results
 }

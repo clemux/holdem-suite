@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {ref} from "vue";
 import Summaries from "./components/Summaries.vue";
+import Hands from "./components/Hands.vue";
 import {QSplitter, QTabs} from "quasar";
 
 const splitterModel = ref(20);
@@ -39,6 +40,7 @@ const tab = ref('tournaments');
           </q-tab-panel>
 
           <q-tab-panel name="hands">
+            <Hands />
           </q-tab-panel>
 
 
