@@ -1,11 +1,28 @@
 <script setup lang="ts">
-import {ref} from "vue";
+import {onMounted, ref} from "vue";
 import Summaries from "./components/Summaries.vue";
 import Hands from "./components/Hands.vue";
 import {QSplitter, QTabs} from "quasar";
+import type {Event} from '@tauri-apps/api/event'
+import {listen} from "@tauri-apps/api/event";
 
 const splitterModel = ref(20);
 const tab = ref('tournaments');
+
+
+async function listenMenuEvent() {
+  try {
+    return await listen('watcher', (event: Event<any>) => {
+      console.log(event);
+    })
+  }
+  catch (e) {
+  }
+}
+
+onMounted(() => {
+  listenMenuEvent()
+})
 
 </script>
 
