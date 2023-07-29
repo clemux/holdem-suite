@@ -6,6 +6,7 @@ diesel::table! {
         hole_card_1 -> Text,
         hole_card_2 -> Text,
         tournament_id -> Nullable<Integer>,
+        datetime -> Text,
     }
 }
 

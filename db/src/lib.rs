@@ -48,6 +48,7 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
                 parser::TableName::Tournament(_, tournament_id_, _) => Some(tournament_id_ as i32),
                 _ => None,
             },
+            datetime: h.hand_info.datetime.to_string(),
         })
         .collect();
 

@@ -26,6 +26,7 @@ pub struct Hand {
     pub hole_card_1: String,
     pub hole_card_2: String,
     pub tournament_id: Option<i32>,
+    pub datetime: String,
 }
 
 #[derive(Insertable)]
@@ -35,4 +36,5 @@ pub struct NewHand {
     pub hole_card_1: String,
     pub hole_card_2: String,
     pub tournament_id: Option<i32>,
+    pub datetime: String,
 }
