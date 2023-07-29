@@ -45,21 +45,19 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
             hole_card_1: h.dealt_cards.hole_cards.card1.to_string(),
             hole_card_2: h.dealt_cards.hole_cards.card2.to_string(),
             tournament_id: match h.table_info.table_name {
-                parser::TableName::Tournament(_, tournament_id_, _) => {
-                    Some(Some(tournament_id_ as i32))
-                }
-                _ => Some(None),
+                parser::TableName::Tournament(_, tournament_id_, _) => Some(tournament_id_ as i32),
+                _ => None,
             },
         })
         .collect();
 
-    for hand in &new_hands {
-        diesel::insert_into(schema::hands::table)
-            .values(hand)
-            .on_conflict_do_nothing()
-            .execute(conn)
-            .expect("Error saving new hands");
-    }
+    // for hand in &new_hands {
+    diesel::insert_into(schema::hands::table)
+        .values(new_hands)
+        .on_conflict_do_nothing()
+        .execute(conn)
+        .expect("Error saving new hands");
+    // }
 }
 
 pub fn get_hands(url: &str) -> Vec<Hand> {
