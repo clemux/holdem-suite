@@ -12,7 +12,7 @@ pub mod schema;
 
 pub fn establish_connection(database_url: &str) -> SqliteConnection {
     println!("Connecting to {}", database_url);
-    SqliteConnection::establish(&database_url)
+    SqliteConnection::establish(database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
@@ -31,11 +31,10 @@ pub fn insert_summary(conn: &mut SqliteConnection, summary: summary_parser::Tour
 
 pub fn get_summaries(url: &str) -> Vec<Summary> {
     let mut connection = establish_connection(url);
-    let results = summaries
-        .select(models::Summary::as_select())
+    summaries
+        .select(Summary::as_select())
         .load(&mut connection)
-        .expect("Error loading summaries");
-    results
+        .expect("Error loading summaries")
 }
 
 pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
@@ -65,9 +64,8 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
 
 pub fn get_hands(url: &str) -> Vec<Hand> {
     let mut connection = establish_connection(url);
-    let results = hands
-        .select(models::Hand::as_select())
+    hands
+        .select(Hand::as_select())
         .load(&mut connection)
-        .expect("Error loading hands");
-    results
+        .expect("Error loading hands")
 }

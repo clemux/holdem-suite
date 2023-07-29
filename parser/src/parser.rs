@@ -851,8 +851,7 @@ impl Hand {
 }
 
 pub fn parse_hands(input: &str) -> IResult<&str, Vec<Hand>> {
-    let result = separated_list1(line_ending, Hand::parse)(input);
-    result
+    separated_list1(line_ending, Hand::parse)(input)
 }
 
 #[cfg(test)]
