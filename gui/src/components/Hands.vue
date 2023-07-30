@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import {ref} from "vue";
+import {onMounted, ref} from "vue";
+import type {Event} from '@tauri-apps/api/event'
+import {listen} from "@tauri-apps/api/event";
 import {invoke} from "@tauri-apps/api/tauri";
 import {QTableColumn} from "quasar";
 
@@ -19,6 +21,21 @@ const columns: QTableColumn[] = [
 ]
 
 const rows = ref([]);
+
+async function listenMenuEvent() {
+  try {
+    return await listen('watcher', (event: Event<any>) => {
+      console.log(event);
+      loadHands();
+    })
+  }
+  catch (e) {
+  }
+}
+
+onMounted(() => {
+  listenMenuEvent()
+})
 
 async function loadHands() {
   rows.value = await invoke("load_hands", {});

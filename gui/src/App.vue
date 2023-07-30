@@ -10,19 +10,7 @@ const splitterModel = ref(20);
 const tab = ref('tournaments');
 
 
-async function listenMenuEvent() {
-  try {
-    return await listen('watcher', (event: Event<any>) => {
-      console.log(event);
-    })
-  }
-  catch (e) {
-  }
-}
 
-onMounted(() => {
-  listenMenuEvent()
-})
 
 </script>
 

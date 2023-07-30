@@ -32,14 +32,6 @@ fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
 
 #[tauri::command]
 fn load_hands(state: tauri::State<Settings>, app_handle: tauri::AppHandle) -> Vec<Hand> {
-    app_handle
-        .emit_all(
-            "watcher",
-            Payload {
-                message: "coucou".into(),
-            },
-        )
-        .unwrap();
     get_hands(state.database_url)
 }
 
@@ -52,19 +44,21 @@ async fn close_splashscreen(window: tauri::Window) {
 }
 
 fn parse_file(path: PathBuf) {
-    let connection =
-        &mut establish_connection("sqlite:///home/clemux/dev/holdem-suite/parser/test.db");
+    let connection = &mut establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
+    let path_cloned = path.clone();
+    let path_str = path_cloned.to_str().unwrap();
     if path.clone().to_str().unwrap().contains("summary") {
         let data = fs::read_to_string(path).expect("Unable to read file");
         let parse_result = summary_parser::TournamentSummary::parse(&data);
         let (_, summary) = parse_result.unwrap();
         insert_summary(connection, summary);
     } else {
+        println!("Parsing {}", path_str);
         let data = fs::read_to_string(path).expect("Unable to read file");
         let parse_result = parse_hands(&data);
         match parse_result {
             Ok((_, hands)) => insert_hands(connection, hands),
-            Err(e) => println!("{}", e),
+            Err(_) => println!("Error parsing {}", path_str),
         }
     }
 }
@@ -77,6 +71,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
         match res {
             Ok(event) => match event.kind {
                 EventKind::Create(_) => {
+                    println!("created file: {:?}", event.paths[0]);
                     parse_file(event.paths[0].clone());
                     app_handle
                         .emit_all(
@@ -88,12 +83,14 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
                         .unwrap();
                 }
                 EventKind::Modify(_) => {
-                    parse_file(event.paths[0].clone());
+                    let path = event.paths[0].clone();
+                    println!("modified file: {:?}", path);
+                    parse_file(path.clone());
                     app_handle
                         .emit_all(
                             "watcher",
                             Payload {
-                                message: "new file".into(),
+                                message: format!("{}", path.clone().display()),
                             },
                         )
                         .unwrap();
@@ -116,6 +113,7 @@ fn setup_app(app: &App, settings: Settings) -> Result<(), Box<dyn std::error::Er
     )
     .menu(menu)
     .visible(false)
+    .title("Holdem Suite Tracker")
     .build()?;
     let window_ = window.clone();
     window_.on_menu_event(move |event| {
