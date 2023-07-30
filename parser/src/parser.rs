@@ -22,8 +22,8 @@ impl TournamentInfo {
     fn parse(input: &str) -> IResult<&str, TournamentInfo> {
         let name_parser = delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""));
 
-        let buyin_parser = terminated(float, tag("€"));
-        let rake_parser = terminated(float, tag("€"));
+        let buyin_parser = terminated(float, opt(tag("€")));
+        let rake_parser = terminated(float, opt(tag("€")));
 
         let buyin_rake_parser = preceded(
             tag("buyIn: "),
@@ -255,33 +255,18 @@ impl TableInfo {
 }
 
 #[derive(Debug, PartialEq)]
-enum Stack {
-    Chips(u32),
-    Money(f32),
-}
-
-impl Stack {
-    fn parse(input: &str) -> IResult<&str, Stack> {
-        let stack_chips = map(nom::character::complete::u32, Stack::Chips);
-        let stack_money = map(terminated(float, tag("€")), Stack::Money);
-        let (input, stack) = alt((stack_money, stack_chips)).parse(input)?;
-        Ok((input, stack))
-    }
-}
-
-#[derive(Debug, PartialEq)]
 pub struct Seat {
     seat_number: u32,
     player_name: String,
-    stack: Stack,
+    stack: f32,
     bounty: Option<f32>,
 }
 
 impl Seat {
     fn parse(input: &str) -> IResult<&str, Seat> {
         let stack_bounty = tuple((
-            Stack::parse,
-            opt(preceded(tag(", "), terminated(float, tag("€ bounty")))),
+            terminated(float, opt(tag("€"))),
+            opt(preceded(tag(", "), terminated(float, opt(tag("€ bounty"))))),
         ));
         let (input, (seat_number, _, player_name, _, (stack, bounty))) = tuple((
             preceded(tag("Seat "), nom::character::complete::u32),
@@ -308,39 +293,29 @@ fn parse_seats(input: &str) -> IResult<&str, Vec<Seat>> {
     Ok((input, seats))
 }
 
-#[derive(Debug, PartialEq)]
-enum AmountType {
-    Chips(u32),
-    Money(f32),
-}
-
-impl AmountType {
-    fn parse(input: &str) -> IResult<&str, AmountType> {
-        let amount_chips = map(nom::character::complete::u32, AmountType::Chips);
-        let amount_money = map(terminated(float, tag("€")), AmountType::Money);
-        let (input, amount) = alt((amount_money, amount_chips)).parse(input)?;
-        Ok((input, amount))
-    }
+fn parse_amount(input: &str) -> IResult<&str, f32> {
+    let (input, amount) = terminated(float, opt(tag("€"))).parse(input)?;
+    Ok((input, amount))
 }
 
 #[derive(Debug, PartialEq)]
 enum PostType {
-    BigBlind(AmountType),
-    SmallBlind(AmountType),
-    Ante(AmountType),
+    BigBlind(f32),
+    SmallBlind(f32),
+    Ante(f32),
 }
 
 impl PostType {
     fn parse(input: &str) -> IResult<&str, PostType> {
         let small_blind = map(
-            preceded(tag("small blind "), AmountType::parse),
+            preceded(tag("small blind "), parse_amount),
             PostType::SmallBlind,
         );
         let big_blind = map(
-            preceded(tag("big blind "), AmountType::parse),
+            preceded(tag("big blind "), parse_amount),
             PostType::BigBlind,
         );
-        let ante = map(preceded(tag("ante "), AmountType::parse), PostType::Ante);
+        let ante = map(preceded(tag("ante "), parse_amount), PostType::Ante);
         let (input, post_type) = alt((small_blind, big_blind, ante)).parse(input)?;
         Ok((input, post_type))
     }
@@ -348,19 +323,12 @@ impl PostType {
 
 #[derive(Debug, PartialEq)]
 enum ActionType {
-    Bet {
-        amount: AmountType,
-    },
-    Call {
-        amount: AmountType,
-    },
+    Bet { amount: f32 },
+    Call { amount: f32 },
     Check,
     Fold,
     Post(PostType),
-    Raise {
-        to_call: AmountType,
-        amount: AmountType,
-    },
+    Raise { to_call: f32, amount: f32 },
     Collect,
     Shows,
 }
@@ -372,16 +340,16 @@ impl ActionType {
             map(tag("checks"), |_| ActionType::Check),
             map(tag("folds"), |_| ActionType::Fold),
             // TODO: handle "all-in"
-            map(preceded(tag("calls "), AmountType::parse), |x| {
+            map(preceded(tag("calls "), parse_amount), |x| {
                 ActionType::Call { amount: x }
             }),
-            map(preceded(tag("bets "), AmountType::parse), |x| {
-                ActionType::Bet { amount: x }
+            map(preceded(tag("bets "), parse_amount), |x| ActionType::Bet {
+                amount: x,
             }),
             map(
                 preceded(
                     tag("raises "),
-                    tuple((AmountType::parse, tag(" to "), AmountType::parse)),
+                    tuple((parse_amount, tag(" to "), parse_amount)),
                 ),
                 |(to_call, _, amount)| ActionType::Raise { to_call, amount },
             ),
@@ -656,7 +624,7 @@ impl Board {
 
 #[derive(Debug, PartialEq)]
 enum SummaryResult {
-    Won(AmountType),
+    Won(f32),
     Lost,
 }
 
@@ -749,7 +717,7 @@ impl SummaryPlayer {
         let position = delimited(tag(" ("), take_until(")"), tag(")"));
         let showed = delimited(tag(" showed ["), HoleCards::parse, tag("] and"));
         let result = alt((
-            map(preceded(tag(" won "), AmountType::parse), |amount| {
+            map(preceded(tag(" won "), parse_amount), |amount| {
                 SummaryResult::Won(amount)
             }),
             map(tag(" lost"), |_| SummaryResult::Lost),
@@ -781,17 +749,17 @@ impl SummaryPlayer {
 
 #[derive(Debug, PartialEq)]
 pub struct Summary {
-    pot: AmountType,
-    rake: Option<AmountType>,
+    pot: f32,
+    rake: Option<f32>,
     players: Vec<SummaryPlayer>,
     board: Option<Board>,
 }
 
 impl Summary {
     fn parse(input: &str) -> IResult<&str, Summary> {
-        let pot_amount = delimited(tag("Total pot "), AmountType::parse, tag(" | "));
+        let pot_amount = delimited(tag("Total pot "), parse_amount, tag(" | "));
         let rake = alt((
-            map(preceded(tag("Rake "), AmountType::parse), Some),
+            map(preceded(tag("Rake "), parse_amount), Some),
             map(tag("No rake"), |_| None),
         ));
         let (input, (pot_amount, rake, _, board, players)) = tuple((
@@ -1039,7 +1007,7 @@ mod tests {
         let expected = Seat {
             seat_number: 5,
             player_name: String::from("WinterSound"),
-            stack: Stack::Chips(20000),
+            stack: 20000.0,
             bounty: Some(0.45),
         };
         let (_, actual) = Seat::parse(input).unwrap();
@@ -1052,7 +1020,7 @@ mod tests {
         let expected = Seat {
             seat_number: 3,
             player_name: String::from("WinterSound"),
-            stack: Stack::Chips(18744),
+            stack: 18744.0,
             bounty: None,
         };
         let (_, actual) = Seat::parse(input).unwrap();
@@ -1065,7 +1033,7 @@ mod tests {
         let expected = Seat {
             seat_number: 3,
             player_name: String::from("Winter Sound"),
-            stack: Stack::Money(0.50),
+            stack: 0.50,
             bounty: None,
         };
         let (_, actual) = Seat::parse(input).unwrap();
@@ -1079,13 +1047,13 @@ mod tests {
             Seat {
                 seat_number: 1,
                 player_name: String::from("WinterSound"),
-                stack: Stack::Chips(20000),
+                stack: 20000.0,
                 bounty: Some(0.45),
             },
             Seat {
                 seat_number: 2,
                 player_name: String::from("Player Two"),
-                stack: Stack::Chips(18744),
+                stack: 18744.0,
                 bounty: None,
             },
         ];
@@ -1108,37 +1076,37 @@ mod tests {
             Seat {
                 seat_number: 1,
                 player_name: String::from("Anonymous1"),
-                stack: Stack::Chips(23940),
+                stack: 23940.0,
                 bounty: Some(0.45),
             },
             Seat {
                 seat_number: 2,
                 player_name: String::from("Anonymous 2"),
-                stack: Stack::Chips(14388),
+                stack: 14388.0,
                 bounty: Some(0.45),
             },
             Seat {
                 seat_number: 3,
                 player_name: String::from("Anonymous 3"),
-                stack: Stack::Chips(20410),
+                stack: 20410.0,
                 bounty: Some(0.45),
             },
             Seat {
                 seat_number: 4,
                 player_name: String::from("Anonymous4"),
-                stack: Stack::Chips(15425),
+                stack: 15425.0,
                 bounty: Some(0.45),
             },
             Seat {
                 seat_number: 5,
                 player_name: String::from("WinterSound"),
-                stack: Stack::Chips(14285),
+                stack: 14285.0,
                 bounty: Some(0.45),
             },
             Seat {
                 seat_number: 6,
                 player_name: String::from("Anonymous5"),
-                stack: Stack::Chips(109973),
+                stack: 109973.0,
                 bounty: Some(1.0),
             },
         ];
@@ -1149,7 +1117,7 @@ mod tests {
     #[test]
     fn test_parse_post_type_sb() {
         let input = "small blind 250\n";
-        let expected = PostType::SmallBlind(AmountType::Chips(250));
+        let expected = PostType::SmallBlind(250.0);
         let (_, actual) = PostType::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1157,7 +1125,7 @@ mod tests {
     #[test]
     fn test_parse_post_type_bb_cash() {
         let input = "big blind 0.02€\n";
-        let expected = PostType::BigBlind(AmountType::Money(0.02));
+        let expected = PostType::BigBlind(0.02);
         let (_, actual) = PostType::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1165,7 +1133,7 @@ mod tests {
     #[test]
     fn test_parse_post_type_ante_chips() {
         let input = "big blind 60\n";
-        let expected = PostType::BigBlind(AmountType::Chips(60));
+        let expected = PostType::BigBlind(60.0);
         let (_, actual) = PostType::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1173,7 +1141,7 @@ mod tests {
     #[test]
     fn test_parse_action_type_post_bb() {
         let input = "posts big blind 500\n";
-        let expected = ActionType::Post(PostType::BigBlind(AmountType::Chips(500)));
+        let expected = ActionType::Post(PostType::BigBlind(500.0));
         let (_, actual) = ActionType::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1189,9 +1157,7 @@ mod tests {
     #[test]
     fn test_parse_action_type_call() {
         let input = "calls 500\n";
-        let expected = ActionType::Call {
-            amount: AmountType::Chips(500),
-        };
+        let expected = ActionType::Call { amount: 500.0 };
         let (_, actual) = ActionType::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1199,9 +1165,7 @@ mod tests {
     #[test]
     fn test_parse_action_type_bet() {
         let input = "bets 500\n";
-        let expected = ActionType::Bet {
-            amount: AmountType::Chips(500),
-        };
+        let expected = ActionType::Bet { amount: 500.0 };
         let (_, actual) = ActionType::parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -1210,8 +1174,8 @@ mod tests {
     fn test_parse_action_type_raise() {
         let input = "raises 500 to 1000\n";
         let expected = ActionType::Raise {
-            to_call: AmountType::Chips(500),
-            amount: AmountType::Chips(1000),
+            to_call: 500.0,
+            amount: 1000.0,
         };
         let (_, actual) = ActionType::parse(input).unwrap();
         assert_eq!(expected, actual);
@@ -1247,8 +1211,8 @@ mod tests {
         let expected = Action {
             player_name: String::from("Player One"),
             action: ActionType::Raise {
-                to_call: AmountType::Chips(500),
-                amount: AmountType::Chips(1000),
+                to_call: 500.0,
+                amount: 1000.0,
             },
             is_all_in: false,
         };
@@ -1286,16 +1250,14 @@ mod tests {
                 Action {
                     player_name: String::from("Player One"),
                     action: ActionType::Raise {
-                        to_call: AmountType::Chips(500),
-                        amount: AmountType::Chips(1000),
+                        to_call: 500.0,
+                        amount: 1000.0,
                     },
                     is_all_in: false,
                 },
                 Action {
                     player_name: String::from("Player Two"),
-                    action: ActionType::Call {
-                        amount: AmountType::Chips(1000),
-                    },
+                    action: ActionType::Call { amount: 1000.0 },
                     is_all_in: false,
                 },
             ],
@@ -1389,7 +1351,7 @@ mod tests {
         let expected = SummaryPlayer {
             seat: 6,
             name: String::from("Alexarango"),
-            result: SummaryResult::Won(AmountType::Money(0.31)),
+            result: SummaryResult::Won(0.31),
             hole_cards: None,
             hand_category: None,
         };
@@ -1404,7 +1366,7 @@ mod tests {
         let expected = SummaryPlayer {
             seat: 6,
             name: String::from("Alexarango"),
-            result: SummaryResult::Won(AmountType::Money(0.36)),
+            result: SummaryResult::Won(0.36),
             hole_cards: Some(HoleCards {
                 card1: Card {
                     rank: Rank::Eight,
@@ -1428,7 +1390,7 @@ mod tests {
         let expected = SummaryPlayer {
             seat: 3,
             name: String::from("Player Two"),
-            result: SummaryResult::Won(AmountType::Money(0.36)),
+            result: SummaryResult::Won(0.36),
             hole_cards: Some(HoleCards {
                 card1: Card {
                     rank: Rank::Queen,
@@ -1449,12 +1411,12 @@ mod tests {
     fn test_parse_summary_no_flop_no_rake() {
         let input = "Total pot 2670 | No rake\nSeat 3: Player One won 2670\n\n";
         let expected = Summary {
-            pot: AmountType::Chips(2670),
+            pot: 2670.0,
             rake: None,
             players: vec![SummaryPlayer {
                 seat: 3,
                 name: String::from("Player One"),
-                result: SummaryResult::Won(AmountType::Chips(2670)),
+                result: SummaryResult::Won(2670.0),
                 hole_cards: None,
                 hand_category: None,
             }],
@@ -1469,12 +1431,12 @@ mod tests {
         let input =
             "Total pot 0.79€ | Rake 0.01€\nBoard: [8c 5h Ts Kd Td]\nSeat 3: Player One won 0.79€";
         let expected = Summary {
-            pot: AmountType::Money(0.79),
-            rake: Some(AmountType::Money(0.01)),
+            pot: 0.79,
+            rake: Some(0.01),
             players: vec![SummaryPlayer {
                 seat: 3,
                 name: String::from("Player One"),
-                result: SummaryResult::Won(AmountType::Money(0.79)),
+                result: SummaryResult::Won(0.79),
                 hole_cards: None,
                 hand_category: None,
             }],
@@ -1512,12 +1474,12 @@ mod tests {
         let input =
             "Total pot 2670 | No rake\nBoard: [8s 7h 4h 3s 2h]\nSeat 3: Player One won 2670\n\n";
         let expected = Summary {
-            pot: AmountType::Chips(2670),
+            pot: 2670.0,
             rake: None,
             players: vec![SummaryPlayer {
                 seat: 3,
                 name: String::from("Player One"),
-                result: SummaryResult::Won(AmountType::Chips(2670)),
+                result: SummaryResult::Won(2670.0),
                 hole_cards: None,
                 hand_category: None,
             }],
@@ -1561,13 +1523,13 @@ mod tests {
         );
 
         let expected = Summary {
-            pot: AmountType::Money(0.30),
-            rake: Some(AmountType::Money(0.03)),
+            pot: 0.30,
+            rake: Some(0.03),
             players: vec![
                 SummaryPlayer {
                     seat: 2,
                     name: String::from("Player One"),
-                    result: SummaryResult::Won(AmountType::Money(0.30)),
+                    result: SummaryResult::Won(0.30),
                     hole_cards: Some(HoleCards {
                         card1: Card {
                             rank: Rank::Nine,
@@ -1689,37 +1651,37 @@ mod tests {
                 Seat {
                     seat_number: 1,
                     player_name: String::from("Anonymous1"),
-                    stack: Stack::Chips(23940),
+                    stack: 23940.0,
                     bounty: Some(0.45),
                 },
                 Seat {
                     seat_number: 2,
                     player_name: String::from("Anonymous 2"),
-                    stack: Stack::Chips(14388),
+                    stack: 14388.0,
                     bounty: Some(0.45),
                 },
                 Seat {
                     seat_number: 3,
                     player_name: String::from("Anonymous 3"),
-                    stack: Stack::Chips(20410),
+                    stack: 20410.0,
                     bounty: Some(0.45),
                 },
                 Seat {
                     seat_number: 4,
                     player_name: String::from("Anonymous4"),
-                    stack: Stack::Chips(15425),
+                    stack: 15425.0,
                     bounty: Some(0.45),
                 },
                 Seat {
                     seat_number: 5,
                     player_name: String::from("WinterSound"),
-                    stack: Stack::Chips(14285),
+                    stack: 14285.0,
                     bounty: Some(0.45),
                 },
                 Seat {
                     seat_number: 6,
                     player_name: String::from("Anonymous5"),
-                    stack: Stack::Chips(109973),
+                    stack: 109973.0,
                     bounty: Some(1.0),
                 },
             ],
@@ -1747,8 +1709,8 @@ mod tests {
                     Action {
                         player_name: String::from("Anonymous 3"),
                         action: ActionType::Raise {
-                            to_call: AmountType::Chips(750),
-                            amount: AmountType::Chips(1350),
+                            to_call: 750.0,
+                            amount: 1350.0,
                         },
                         is_all_in: false,
                     },
@@ -1780,13 +1742,13 @@ mod tests {
                 ],
             }],
             summary: Summary {
-                pot: AmountType::Chips(2670),
+                pot: 2670.0,
                 rake: None,
                 players: vec![SummaryPlayer {
                     name: String::from("Anonymous 3"),
                     seat: 3,
                     hole_cards: None,
-                    result: SummaryResult::Won(AmountType::Chips(2670)),
+                    result: SummaryResult::Won(2670.0),
                     hand_category: None,
                 }],
                 board: None,
@@ -1811,17 +1773,17 @@ mod tests {
         assert_eq!(hands.len(), 1);
     }
 
-    // #[test]
-    // fn test_parse_hands_play_money() {
-    //     let data = include_str!("../samples/sample_expresso_play_money.txt");
-    //     let (_, hands) = parse_hands(data).unwrap();
-    //     assert_eq!(hands.len(), 3);
-    // }
-    //
-    // #[test]
-    // fn test_parse_hands_cash_play_money() {
-    //     let data = include_str!("../samples/sample_cash_play_money.txt");
-    //     let (_, hands) = parse_hands(data).unwrap();
-    //     assert_eq!(hands.len(), 3);
-    // }
+    #[test]
+    fn test_parse_hands_play_money() {
+        let data = include_str!("../samples/sample_expresso_play_money.txt");
+        let (_, hands) = parse_hands(data).unwrap();
+        assert_eq!(hands.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_hands_cash_play_money() {
+        let data = include_str!("../samples/sample_cash_play_money.txt");
+        let (_, hands) = parse_hands(data).unwrap();
+        assert_eq!(hands.len(), 1);
+    }
 }
