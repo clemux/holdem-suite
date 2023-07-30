@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 use notify::EventKind;
@@ -25,17 +26,17 @@ enum Commands {
 }
 
 fn parse(path: Vec<PathBuf>) {
+    let start = Instant::now();
     let mut count = 0;
     for path in path {
         parse_file(path);
         count += 1;
     }
-    println!("Parsed {} files", count);
+    println!("Parsed {} files in {:?}", count, start.elapsed());
 }
 
 fn parse_file(path: PathBuf) {
-    let connection =
-        &mut establish_connection("sqlite:///home/clemux/dev/holdem-suite/parser/test.db");
+    let connection = &mut establish_connection("sqlite:///home/clemux/dev/holdem-suite/test2.db");
     println!("{}", path.display());
     if path.clone().to_str().unwrap().contains("summary") {
         let data = fs::read_to_string(path).expect("Unable to read file");
@@ -45,8 +46,12 @@ fn parse_file(path: PathBuf) {
     } else {
         let data = fs::read_to_string(path).expect("Unable to read file");
         let parse_result = parse_hands(&data);
+        let start = Instant::now();
         match parse_result {
-            Ok((_, hands)) => insert_hands(connection, hands),
+            Ok((_, hands)) => {
+                let nb_hands = insert_hands(connection, hands);
+                println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
+            }
             Err(e) => println!("{}", e),
         }
     }

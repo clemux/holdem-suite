@@ -37,7 +37,7 @@ pub fn get_summaries(url: &str) -> Vec<Summary> {
         .expect("Error loading summaries")
 }
 
-pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
+pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -> u32 {
     let new_hands: Vec<NewHand> = hands_vec
         .into_iter()
         .map(|h| NewHand {
@@ -59,6 +59,7 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) {
             .execute(conn)
             .expect("Error saving new hands");
     }
+    new_hands.len() as u32
 }
 
 pub fn get_hands(url: &str) -> Vec<Hand> {

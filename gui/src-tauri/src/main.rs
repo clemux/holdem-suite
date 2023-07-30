@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 use std::{fs, thread};
 
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -55,9 +56,13 @@ fn parse_file(path: PathBuf) {
     } else {
         println!("Parsing {}", path_str);
         let data = fs::read_to_string(path).expect("Unable to read file");
+        let start = Instant::now();
         let parse_result = parse_hands(&data);
         match parse_result {
-            Ok((_, hands)) => insert_hands(connection, hands),
+            Ok((_, hands)) => {
+                let nb_hands = insert_hands(connection, hands);
+                println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
+            }
             Err(_) => println!("Error parsing {}", path_str),
         }
     }
