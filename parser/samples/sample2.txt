@@ -1,0 +1,34 @@
+Winamax Poker - HOLD-UP "Colorado" - HandId: #18671167-1064605-1690707726 - Holdem no limit (0.01€/0.02€) - 2023/07/30 09:02:06 UTC
+Table: 'Colorado' 6-max (real money) Seat #6 is the button
+Seat 1: Anonymous 1 (9.41€)
+Seat 2: WinterSound (0.55€)
+Seat 3: Anonymous 2 (2.35€)
+Seat 4: Anonymous 3 (3.29€)
+Seat 5: Anonymous 4 (2.27€)
+Seat 6: Anonymous 5 (2€)
+*** ANTE/BLINDS ***
+Anonymous 1 posts small blind 0.01€
+WinterSound posts big blind 0.02€
+Dealt to WinterSound [Jd Td]
+*** PRE-FLOP ***
+Anonymous 2 raises 0.04€ to 0.06€
+Anonymous 3 raises 0.15€ to 0.21€
+Anonymous 4 folds
+Anonymous 5 folds
+Anonymous 1 folds
+WinterSound raises 0.34€ to 0.55€ and is all-in
+Anonymous 2 folds
+Anonymous 3 raises 0.34€ to 0.89€
+*** FLOP *** [Jh 6h 8d]
+*** TURN *** [Jh 6h 8d][4d]
+*** RIVER *** [Jh 6h 8d 4d][5s]
+*** SHOW DOWN ***
+WinterSound shows [Jd Td] (One pair : Jacks)
+Anonymous 3 shows [Kc Ah] (High card : Ace)
+Anonymous 3 collected 0.34€ from side pot 1
+WinterSound collected 1.05€ from main pot
+*** SUMMARY ***
+Total pot 1.39€ | Rake 0.12€
+Board: [Jh 6h 8d 4d 5s]
+Seat 2: WinterSound (big blind) showed [Jd Td] and won 1.05€ with One pair : Jacks
+Seat 4: Anonymous 3 showed [Kc Ah] and won 0.34€ with High card : Ace

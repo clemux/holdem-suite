@@ -5,9 +5,9 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till, take_until, take_while};
 use nom::character::complete::{alpha1, anychar, char, line_ending, none_of, not_line_ending};
 use nom::combinator::{eof, map, map_res, opt};
-use nom::multi::{many1, many_till, separated_list0, separated_list1};
+use nom::multi::{many0, many1, many_till, separated_list0, separated_list1};
 use nom::number::complete::float;
-use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple, Tuple};
+use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
 
 #[derive(Debug, PartialEq)]
@@ -407,15 +407,15 @@ struct Action {
 
 impl Action {
     fn parse(input: &str) -> IResult<&str, Action> {
-        let (input, (player_name_vec, action_type)) =
+        let (input, (player_name_vec, (action_type, all_in))) =
             // anychar would work too, but we want to fail on newlines for robustness
-            many_till(none_of("\n"), preceded(tag(" "), ActionType::parse))(input)?;
+            many_till(none_of("\n"), delimited(tag(" "), pair(ActionType::parse, opt(tag(" and is all-in"))), tag("\n")))(input)?;
         Ok((
             input,
             Action {
                 player_name: player_name_vec.into_iter().collect(),
                 action: action_type,
-                is_all_in: false,
+                is_all_in: all_in.is_some(),
             },
         ))
     }
@@ -623,11 +623,10 @@ impl Street {
             map(tag("*** SHOW DOWN ***"), |_| StreetType::Showdown),
         ));
 
-        let (input, (street_type, _, actions, _)) = tuple((
+        let (input, (street_type, _, actions)) = tuple((
             street_type,
             many_till(anychar, line_ending), // ignore partial boards
-            separated_list1(line_ending, Action::parse),
-            line_ending,
+            many0(Action::parse),
         ))(input)?;
         Ok((
             input,
@@ -860,8 +859,6 @@ pub fn parse_hands(input: &str) -> IResult<&str, Vec<Hand>> {
 
 #[cfg(test)]
 mod tests {
-    use nom::multi::separated_list1;
-
     use super::*;
 
     #[test]
@@ -1802,7 +1799,29 @@ mod tests {
     #[test]
     fn test_parse_hands() {
         let data = include_str!("../samples/sample1.txt");
-        let (_, hands) = separated_list1(line_ending, Hand::parse)(data).unwrap();
+        let (_, hands) = parse_hands(data).unwrap();
         assert_eq!(hands.len(), 3);
     }
+
+    #[test]
+    fn test_parse_empty_streets() {
+        let data = include_str!("../samples/sample2.txt");
+        let (_, hands) = parse_hands(data).unwrap();
+        println!("{:?}", hands);
+        assert_eq!(hands.len(), 1);
+    }
+
+    // #[test]
+    // fn test_parse_hands_play_money() {
+    //     let data = include_str!("../samples/sample_expresso_play_money.txt");
+    //     let (_, hands) = parse_hands(data).unwrap();
+    //     assert_eq!(hands.len(), 3);
+    // }
+    //
+    // #[test]
+    // fn test_parse_hands_cash_play_money() {
+    //     let data = include_str!("../samples/sample_cash_play_money.txt");
+    //     let (_, hands) = parse_hands(data).unwrap();
+    //     assert_eq!(hands.len(), 3);
+    // }
 }
