@@ -14,27 +14,32 @@ const columns: QTableColumn[] = [
     field: 'id',
     sortable: true
   },
-  { name: 'Card 1', align: 'center', label: 'Card 1', field: 'hole_card_1'},
-  { name: 'Card 2', align: 'center', label: 'Card 2', field: 'hole_card_2'},
-  { name: 'tournamentId', label: 'Tournament', field: 'tournament_id', sortable: true },
-  { name: 'datetime', label: 'Date', field: 'datetime', sortable: true}
+  {name: 'Card 1', align: 'center', label: 'Card 1', field: 'hole_card_1'},
+  {name: 'Card 2', align: 'center', label: 'Card 2', field: 'hole_card_2'},
+  {name: 'tournamentId', label: 'Tournament', field: 'tournament_id', sortable: true},
+  {name: 'datetime', label: 'Date', field: 'datetime', sortable: true}
 ]
 
 const rows = ref([]);
 
-async function listenMenuEvent() {
+const initialPagination = {
+  sortBy: 'datetime',
+  descending: true,
+  rowsPerPage: 10
+}
+
+async function listenWatcherEvent() {
   try {
     return await listen('watcher', (event: Event<any>) => {
       console.log(event);
       loadHands();
     })
-  }
-  catch (e) {
+  } catch (e) {
   }
 }
 
 onMounted(() => {
-  listenMenuEvent()
+  listenWatcherEvent()
 })
 
 async function loadHands() {
@@ -45,10 +50,11 @@ async function loadHands() {
 <template>
   <div class="container">
     <q-table
-      title="Hands"
-      :rows="rows"
-      :columns="columns"
-      row-key="name"
+        title="Hands"
+        :rows="rows"
+        :columns="columns"
+        row-key="name"
+        :pagination="initialPagination"
     />
     <form class="row" @submit.prevent="loadHands">
       <button type="submit">Load</button>
