@@ -6,15 +6,15 @@ use nom::bytes::complete::{tag, take_till, take_until, take_while};
 use nom::character::complete::{alpha1, anychar, char, line_ending, none_of, not_line_ending};
 use nom::combinator::{eof, map, map_res, opt};
 use nom::multi::{many0, many1, many_till, separated_list0, separated_list1};
-use nom::number::complete::float;
+use nom::number::complete::double;
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple, Tuple};
 use nom::{IResult, Parser};
 
 #[derive(Debug, PartialEq)]
 pub struct TournamentInfo {
     name: String,
-    buy_in: f32,
-    rake: f32,
+    buy_in: f64,
+    rake: f64,
     level: u32,
 }
 
@@ -22,8 +22,8 @@ impl TournamentInfo {
     fn parse(input: &str) -> IResult<&str, TournamentInfo> {
         let name_parser = delimited(tag("\""), take_while(|c: char| c != '"'), tag("\""));
 
-        let buyin_parser = terminated(float, opt(tag("€")));
-        let rake_parser = terminated(float, opt(tag("€")));
+        let buyin_parser = terminated(double, opt(tag("€")));
+        let rake_parser = terminated(double, opt(tag("€")));
 
         let buyin_rake_parser = preceded(
             tag("buyIn: "),
@@ -80,13 +80,13 @@ impl GameInfo {
 
 #[derive(Debug, PartialEq)]
 pub struct Blinds {
-    ante: Option<f32>,
-    small_blind: f32,
-    big_blind: f32,
+    ante: Option<f64>,
+    small_blind: f64,
+    big_blind: f64,
 }
 
-fn parse_blind(input: &str) -> IResult<&str, f32> {
-    let (input, blind) = terminated(float, opt(tag("€"))).parse(input)?;
+fn parse_blind(input: &str) -> IResult<&str, f64> {
+    let (input, blind) = terminated(double, opt(tag("€"))).parse(input)?;
     Ok((input, blind))
 }
 
@@ -258,15 +258,18 @@ impl TableInfo {
 pub struct Seat {
     seat_number: u32,
     player_name: String,
-    stack: f32,
-    bounty: Option<f32>,
+    stack: f64,
+    bounty: Option<f64>,
 }
 
 impl Seat {
     fn parse(input: &str) -> IResult<&str, Seat> {
         let stack_bounty = tuple((
-            terminated(float, opt(tag("€"))),
-            opt(preceded(tag(", "), terminated(float, opt(tag("€ bounty"))))),
+            terminated(double, opt(tag("€"))),
+            opt(preceded(
+                tag(", "),
+                terminated(double, opt(tag("€ bounty"))),
+            )),
         ));
         let (input, (seat_number, _, player_name, _, (stack, bounty))) = tuple((
             preceded(tag("Seat "), nom::character::complete::u32),
@@ -293,16 +296,16 @@ fn parse_seats(input: &str) -> IResult<&str, Vec<Seat>> {
     Ok((input, seats))
 }
 
-fn parse_amount(input: &str) -> IResult<&str, f32> {
-    let (input, amount) = terminated(float, opt(tag("€"))).parse(input)?;
+fn parse_amount(input: &str) -> IResult<&str, f64> {
+    let (input, amount) = terminated(double, opt(tag("€"))).parse(input)?;
     Ok((input, amount))
 }
 
 #[derive(Debug, PartialEq)]
-enum PostType {
-    BigBlind(f32),
-    SmallBlind(f32),
-    Ante(f32),
+pub enum PostType {
+    BigBlind(f64),
+    SmallBlind(f64),
+    Ante(f64),
 }
 
 impl PostType {
@@ -322,13 +325,13 @@ impl PostType {
 }
 
 #[derive(Debug, PartialEq)]
-enum ActionType {
-    Bet { amount: f32 },
-    Call { amount: f32 },
+pub enum ActionType {
+    Bet { amount: f64 },
+    Call { amount: f64 },
     Check,
     Fold,
     Post(PostType),
-    Raise { to_call: f32, amount: f32 },
+    Raise { to_call: f64, amount: f64 },
     Collect,
     Shows,
 }
@@ -366,11 +369,30 @@ impl ActionType {
     }
 }
 
+impl fmt::Display for ActionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ActionType::Bet { .. } => "bet",
+                ActionType::Call { .. } => "call",
+                ActionType::Check => "check",
+                ActionType::Fold => "fold",
+                ActionType::Post(_) => "post",
+                ActionType::Raise { .. } => "raise",
+                ActionType::Collect => "collect",
+                ActionType::Shows => "show",
+            }
+        )
+    }
+}
+
 #[derive(Debug, PartialEq)]
-struct Action {
-    player_name: String,
-    action: ActionType,
-    is_all_in: bool,
+pub struct Action {
+    pub player_name: String,
+    pub action: ActionType,
+    pub is_all_in: bool,
 }
 
 impl Action {
@@ -567,7 +589,7 @@ impl DealtToHero {
 }
 
 #[derive(Debug, PartialEq)]
-enum StreetType {
+pub enum StreetType {
     Preflop,
     Flop,
     Turn,
@@ -575,10 +597,26 @@ enum StreetType {
     Showdown,
 }
 
+impl fmt::Display for StreetType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                StreetType::Preflop => "preflop",
+                StreetType::Flop => "flop",
+                StreetType::Turn => "turn",
+                StreetType::River => "river",
+                StreetType::Showdown => "showdown",
+            }
+        )
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Street {
-    street_type: StreetType,
-    actions: Vec<Action>,
+    pub street_type: StreetType,
+    pub actions: Vec<Action>,
 }
 
 impl Street {
@@ -624,7 +662,7 @@ impl Board {
 
 #[derive(Debug, PartialEq)]
 enum SummaryResult {
-    Won(f32),
+    Won(f64),
     Lost,
 }
 
@@ -749,8 +787,8 @@ impl SummaryPlayer {
 
 #[derive(Debug, PartialEq)]
 pub struct Summary {
-    pot: f32,
-    rake: Option<f32>,
+    pot: f64,
+    rake: Option<f64>,
     players: Vec<SummaryPlayer>,
     board: Option<Board>,
 }
