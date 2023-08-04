@@ -80,6 +80,7 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
                         ActionType::Bet { amount } => Some(amount.into()),
                         ActionType::Call { amount } => Some(amount.into()),
                         ActionType::Raise { amount, .. } => Some(amount.into()),
+                        ActionType::Call { amount } => Some(amount),
                         _ => None,
                     },
                     is_all_in: action.is_all_in as i32,
