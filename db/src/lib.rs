@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 
-use crate::models::{Hand, NewAction, Summary};
+use crate::models::{Action, Hand, NewAction, Summary};
 use crate::schema::hands::dsl::hands;
 use crate::schema::summaries::dsl::summaries;
 use holdem_suite_parser::parser;
@@ -88,7 +88,6 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
             });
         }
     }
-
     diesel::insert_or_ignore_into(schema::hands::table)
         .values(&new_hands)
         .execute(conn)
@@ -102,8 +101,51 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
 
 pub fn get_hands(url: &str) -> Vec<Hand> {
     let mut connection = establish_connection(url);
-    hands
-        .select(Hand::as_select())
+    match hands.select(Hand::as_select()).load(&mut connection) {
+        Ok(hands_) => hands_,
+        Err(e) => {
+            println!("Error getting hands: {}", e);
+            vec![]
+        }
+    }
+}
+
+pub fn get_latest_hand(
+    url: &str,
+    tournament_id: Option<u32>,
+    cash_game_name: Option<String>,
+) -> Option<Hand> {
+    let mut connection = establish_connection(url);
+    let mut query = hands.into_boxed();
+    if let Some(tournament_id_) = tournament_id {
+        query = query.filter(schema::hands::tournament_id.eq(tournament_id_ as i32));
+    }
+    if let Some(cash_game_name_) = cash_game_name {
+        query = query.filter(schema::hands::cash_game_name.eq(cash_game_name_));
+    }
+    match query
+        .order(schema::hands::datetime.desc())
+        .first(&mut connection)
+        .optional()
+    {
+        Ok(hand) => hand,
+        Err(e) => {
+            println!("Error getting latest hand: {}", e);
+            None
+        }
+    }
+}
+
+pub fn get_actions(url: &str, hand_id: String) -> Vec<Action> {
+    let mut connection = establish_connection(url);
+    match schema::actions::table
+        .filter(schema::actions::hand_id.eq(hand_id))
         .load(&mut connection)
-        .expect("Error loading hands")
+    {
+        Ok(actions) => actions,
+        Err(e) => {
+            println!("Error getting actions: {}", e);
+            vec![]
+        }
+    }
 }
