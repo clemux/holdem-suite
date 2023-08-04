@@ -33,8 +33,4 @@ diesel::table! {
 
 diesel::joinable!(actions -> hands (hand_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    actions,
-    hands,
-    summaries,
-);
+diesel::allow_tables_to_appear_in_same_query!(actions, hands, summaries,);

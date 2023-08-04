@@ -18,7 +18,7 @@ pub struct NewSummary {
     pub finish_place: i32,
 }
 
-#[derive(Insertable, Queryable, Selectable, Debug, Serialize)]
+#[derive(Identifiable, Insertable, Queryable, Selectable, Debug, Serialize)]
 #[diesel(table_name = crate::schema::hands)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[diesel(treat_none_as_default_value = false)]
@@ -31,7 +31,7 @@ pub struct Hand {
     pub datetime: String,
 }
 
-#[derive(Queryable, Selectable, Debug, Serialize)]
+#[derive(Identifiable, Queryable, Selectable, Associations, Debug, Serialize)]
 #[diesel(table_name = crate::schema::actions)]
 #[diesel(belongs_to(Hand))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]

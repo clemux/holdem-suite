@@ -12,7 +12,7 @@ use gui::{Table, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_hands, get_latest_hand, get_summaries, insert_hands,
-    insert_summary,
+    insert_summary, Player,
 };
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser;
@@ -46,6 +46,27 @@ fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
 #[tauri::command]
 fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
     get_hands(state.database_url)
+}
+
+#[tauri::command]
+fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, &'static str> {
+    holdem_suite_db::get_players(state.database_url)
+}
+
+#[tauri::command]
+fn load_players_for_table(
+    state: tauri::State<Settings>,
+    table: Table,
+) -> Result<Vec<Player>, &'static str> {
+    match table {
+        Table::CashGame(name) => {
+            holdem_suite_db::get_players_for_table_cash(state.database_url, name)
+        }
+        Table::Tournament { id, .. } => {
+            holdem_suite_db::get_players_for_table_tournament(state.database_url, id as i32)
+        }
+        _ => Err("Invalid table type"),
+    }
 }
 
 #[tauri::command]
@@ -188,7 +209,9 @@ fn main() {
             detect_tables,
             load_summaries,
             load_hands,
-            get_latest_actions
+            get_latest_actions,
+            load_players,
+            load_players_for_table,
         ])
         .manage(settings)
         .run(tauri::generate_context!())
