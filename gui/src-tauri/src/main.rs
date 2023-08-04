@@ -8,12 +8,23 @@ use std::{fs, thread};
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
+use gui::{Table, WindowManager};
 use holdem_suite_db::models::{Hand, Summary};
 use holdem_suite_db::{
     establish_connection, get_hands, get_summaries, insert_hands, insert_summary,
 };
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser;
+
+x11rb::atom_manager! {
+    pub Atoms: AtomsCookie {
+        WM_PROTOCOLS,
+        WM_DELETE_WINDOW,
+        _NET_WM_NAME,
+        _NET_CLIENT_LIST,
+        UTF8_STRING,
+    }
+}
 
 #[derive(Clone)]
 struct Settings<'a> {
@@ -32,8 +43,21 @@ fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
 }
 
 #[tauri::command]
-fn load_hands(state: tauri::State<Settings>, app_handle: tauri::AppHandle) -> Vec<Hand> {
+fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
     get_hands(state.database_url)
+}
+
+#[tauri::command]
+fn detect_tables() -> Vec<String> {
+    let wm = WindowManager::connect().unwrap();
+    let table_windows = wm.table_windows().unwrap();
+    table_windows
+        .iter()
+        .map(|t| match &t.table {
+            Table::CashGame(name) => format!("Cash Game: {}", name),
+            Table::Tournament { name, .. } => format!("Tournament: {}", name),
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -144,6 +168,7 @@ fn main() {
         .setup(move |app| setup_app(app, settings2))
         .invoke_handler(tauri::generate_handler![
             close_splashscreen,
+            detect_tables,
             load_summaries,
             load_hands
         ])

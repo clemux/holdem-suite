@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import {onMounted, ref} from "vue";
+import {ref} from "vue";
 import Summaries from "./components/Summaries.vue";
 import Hands from "./components/Hands.vue";
+import Live from "./components/Live.vue";
 import {QSplitter, QTabs} from "quasar";
-import type {Event} from '@tauri-apps/api/event'
-import {listen} from "@tauri-apps/api/event";
 
 const splitterModel = ref(20);
 const tab = ref('tournaments');
@@ -28,6 +27,7 @@ const tab = ref('tournaments');
         >
           <q-tab name="tournaments" label="Tournaments" />
           <q-tab name="hands" label="Hands" />
+          <q-tab name="live" label="Live" />
         </q-tabs>
       </template>
 
@@ -48,6 +48,9 @@ const tab = ref('tournaments');
             <Hands />
           </q-tab-panel>
 
+          <q-tab-panel name="live">
+            <Live />
+          </q-tab-panel>
 
         </q-tab-panels>
       </template>
