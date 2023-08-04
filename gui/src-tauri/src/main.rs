@@ -9,9 +9,10 @@ use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
 use gui::{Table, WindowManager};
-use holdem_suite_db::models::{Hand, Summary};
+use holdem_suite_db::models::{Action, Hand, Summary};
 use holdem_suite_db::{
-    establish_connection, get_hands, get_summaries, insert_hands, insert_summary,
+    establish_connection, get_actions, get_hands, get_latest_hand, get_summaries, insert_hands,
+    insert_summary,
 };
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser;
@@ -48,16 +49,30 @@ fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
 }
 
 #[tauri::command]
-fn detect_tables() -> Vec<String> {
+fn get_latest_actions(table: Table, state: tauri::State<Settings>) -> Vec<Action> {
+    println!("{:?}", table);
+    match table {
+        Table::CashGame(name) => match get_latest_hand(state.database_url, None, Some(name)) {
+            Some(hand) => return get_actions(state.database_url, hand.id),
+            None => return vec![],
+        },
+        Table::Tournament { id, .. } => match get_latest_hand(state.database_url, Some(id), None) {
+            Some(hand) => return get_actions(state.database_url, hand.id),
+            None => return vec![],
+        },
+        Table::PendingTournament { id, .. } => {
+            println!("Ignoring pending tournament{}", id);
+            vec![]
+        }
+    }
+}
+
+#[tauri::command]
+fn detect_tables() -> Vec<Table> {
     let wm = WindowManager::connect().unwrap();
     let table_windows = wm.table_windows().unwrap();
-    table_windows
-        .iter()
-        .map(|t| match &t.table {
-            Table::CashGame(name) => format!("Cash Game: {}", name),
-            Table::Tournament { name, .. } => format!("Tournament: {}", name),
-        })
-        .collect()
+    println!("{:?}", table_windows);
+    table_windows.into_iter().map(|t| t.table).collect()
 }
 
 #[tauri::command]
@@ -75,8 +90,10 @@ fn parse_file(path: PathBuf) {
     if path.clone().to_str().unwrap().contains("summary") {
         let data = fs::read_to_string(path).expect("Unable to read file");
         let parse_result = summary_parser::TournamentSummary::parse(&data);
-        let (_, summary) = parse_result.unwrap();
-        insert_summary(connection, summary);
+        match parse_result {
+            Ok((_, summary)) => insert_summary(connection, summary),
+            Err(_) => println!("Error parsing {}", path_str),
+        }
     } else {
         println!("Parsing {}", path_str);
         let data = fs::read_to_string(path).expect("Unable to read file");
@@ -170,7 +187,8 @@ fn main() {
             close_splashscreen,
             detect_tables,
             load_summaries,
-            load_hands
+            load_hands,
+            get_latest_actions
         ])
         .manage(settings)
         .run(tauri::generate_context!())

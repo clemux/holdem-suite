@@ -8,6 +8,7 @@ use nom::{
     error::Error,
     IResult, Parser,
 };
+use serde::{Deserialize, Serialize};
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, Window};
 use x11rb::rust_connection::RustConnection;
@@ -19,7 +20,7 @@ x11rb::atom_manager! {
         UTF8_STRING,
     }
 }
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Table {
     CashGame(String),
     Tournament { name: String, id: u32, table: u32 },
