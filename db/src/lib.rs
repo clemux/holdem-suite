@@ -60,8 +60,12 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
             id: hand.hand_info.hand_id.to_owned(),
             hole_card_1: hand.dealt_cards.hole_cards.card1.to_string(),
             hole_card_2: hand.dealt_cards.hole_cards.card2.to_string(),
-            tournament_id: match hand.table_info.table_name {
-                parser::TableName::Tournament(_, tournament_id_, _) => Some(tournament_id_ as i32),
+            tournament_id: match &hand.table_info.table_name {
+                parser::TableName::Tournament(_, tournament_id_, _) => Some(*tournament_id_ as i32),
+                _ => None,
+            },
+            cash_game_name: match &hand.table_info.table_name {
+                parser::TableName::CashGame(name) => Some(name.to_owned()),
                 _ => None,
             },
             datetime: hand.hand_info.datetime.to_string(),

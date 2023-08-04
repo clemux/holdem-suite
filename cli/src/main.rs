@@ -36,7 +36,11 @@ fn parse(path: Vec<PathBuf>) {
 }
 
 fn parse_file(path: PathBuf) {
-    let connection = &mut establish_connection("sqlite:///home/clemux/dev/holdem-suite/test2.db");
+    let db_path = match std::env::var("DATABASE_URL") {
+        Ok(val) => val,
+        Err(_) => String::from("sqlite:///home/clemux/dev/holdem-suite/tracker.db"),
+    };
+    let connection = &mut establish_connection(&db_path);
     println!("{}", path.display());
     if path.clone().to_str().unwrap().contains("summary") {
         let data = fs::read_to_string(path).expect("Unable to read file");
