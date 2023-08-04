@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use nom::branch::alt;
-use nom::combinator::map;
+use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded, tuple};
 use nom::{
     bytes::complete::{tag, take_while},
@@ -23,23 +23,37 @@ x11rb::atom_manager! {
 pub enum Table {
     CashGame(String),
     Tournament { name: String, id: u32, table: u32 },
+    PendingTournament { name: String, id: u32 },
 }
 
 fn parse_tournament(input: &str) -> IResult<&str, Table> {
     let (input, (name, tournament_id, table_id)) = tuple((
         take_while(|c| c != '('),
         delimited(tag("("), nom::character::complete::u32, tag(")")),
-        delimited(tag("(#"), nom::character::complete::u32, tag(")")),
+        opt(delimited(
+            tag("(#"),
+            nom::character::complete::u32,
+            tag(")"),
+        )),
     ))
     .parse(input)?;
-    Ok((
-        input,
-        Table::Tournament {
-            name: name.to_owned(),
-            id: tournament_id,
-            table: table_id,
-        },
-    ))
+    match table_id {
+        Some(table_id) => Ok((
+            input,
+            Table::Tournament {
+                name: name.to_owned(),
+                id: tournament_id,
+                table: table_id,
+            },
+        )),
+        None => Ok((
+            input,
+            Table::PendingTournament {
+                name: name.to_owned(),
+                id: tournament_id,
+            },
+        )),
+    }
 }
 
 impl FromStr for Table {
