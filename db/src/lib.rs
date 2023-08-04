@@ -77,10 +77,9 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
                     player_name: action.player_name.to_owned(),
                     action_type: action.action.to_string(),
                     amount: match action.action {
-                        ActionType::Bet { amount } => Some(amount.into()),
-                        ActionType::Call { amount } => Some(amount.into()),
-                        ActionType::Raise { amount, .. } => Some(amount.into()),
+                        ActionType::Bet { amount } => Some(amount),
                         ActionType::Call { amount } => Some(amount),
+                        ActionType::Raise { amount, .. } => Some(amount),
                         _ => None,
                     },
                     is_all_in: action.is_all_in as i32,
