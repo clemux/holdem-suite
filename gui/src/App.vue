@@ -2,8 +2,8 @@
 import {ref} from "vue";
 import Summaries from "./components/Summaries.vue";
 import Hands from "./components/Hands.vue";
-import Live from "./components/Live.vue";
 import Players from "./components/Players.vue";
+import LiveTables from "./components/LiveTables.vue";
 import {QSplitter, QTabs} from "quasar";
 
 const splitterModel = ref(20);
@@ -28,8 +28,8 @@ const tab = ref('tournaments');
         >
           <q-tab name="tournaments" label="Tournaments" />
           <q-tab name="hands" label="Hands" />
-          <q-tab name="live" label="Live" />
           <q-tab name="players" label="Players" />
+          <q-tab name="liveTables" label="Live" />
         </q-tabs>
       </template>
 
@@ -54,6 +54,9 @@ const tab = ref('tournaments');
             <Players />
           </q-tab-panel>
 
+          <q-tab-panel name="liveTables">
+            <LiveTables />
+          </q-tab-panel>
         </q-tab-panels>
       </template>
 

@@ -6,6 +6,7 @@ use std::time::Instant;
 use std::{fs, thread};
 
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
 use gui::{Table, WindowManager};
@@ -60,10 +61,10 @@ fn load_players_for_table(
 ) -> Result<Vec<Player>, &'static str> {
     match table {
         Table::CashGame(name) => {
-            holdem_suite_db::get_players_for_table_cash(state.database_url, name)
+            holdem_suite_db::get_players_for_table(state.database_url, None, Some(name))
         }
         Table::Tournament { id, .. } => {
-            holdem_suite_db::get_players_for_table_tournament(state.database_url, id as i32)
+            holdem_suite_db::get_players_for_table(state.database_url, Some(id as i32), None)
         }
         _ => Err("Invalid table type"),
     }
@@ -88,12 +89,28 @@ fn get_latest_actions(table: Table, state: tauri::State<Settings>) -> Vec<Action
     }
 }
 
+#[derive(Serialize)]
+struct TsTable {
+    rs_table: Table,
+    name: String,
+}
+
 #[tauri::command]
-fn detect_tables() -> Vec<Table> {
+fn detect_tables() -> Vec<TsTable> {
     let wm = WindowManager::connect().unwrap();
     let table_windows = wm.table_windows().unwrap();
     println!("{:?}", table_windows);
-    table_windows.into_iter().map(|t| t.table).collect()
+    table_windows
+        .iter()
+        .map(|t| TsTable {
+            rs_table: t.table.clone(),
+            name: match &t.table {
+                Table::CashGame(name) => name.to_owned(),
+                Table::Tournament { name, id, .. } => format!("{} ({})", name.to_owned(), id),
+                Table::PendingTournament { name, .. } => name.to_owned(),
+            },
+        })
+        .collect()
 }
 
 #[tauri::command]

@@ -69,7 +69,7 @@ impl FromStr for Table {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TableWindow {
     pub window: Window,
     pub table: Table,
