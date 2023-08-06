@@ -1,5 +1,6 @@
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
+use diesel::result::Error;
 use diesel::SqliteConnection;
 use serde::{Deserialize, Serialize};
 
@@ -44,57 +45,69 @@ pub fn get_summaries(url: &str) -> Vec<Summary> {
         .expect("Error loading summaries")
 }
 
-pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -> u32 {
-    let mut new_hands: Vec<Hand> = vec![];
+pub fn insert_hands(
+    conn: &mut SqliteConnection,
+    hands_vec: Vec<parser::Hand>,
+) -> Result<u32, &'static str> {
     let mut new_actions: Vec<NewAction> = vec![];
-    for hand in &hands_vec {
-        new_hands.push(Hand {
-            id: hand.hand_info.hand_id.to_owned(),
-            hole_card_1: hand.dealt_cards.hole_cards.card1.to_string(),
-            hole_card_2: hand.dealt_cards.hole_cards.card2.to_string(),
-            tournament_id: match &hand.table_info.table_name {
-                parser::TableName::Tournament(_, tournament_id_, _) => Some(*tournament_id_ as i32),
-                _ => None,
-            },
-            cash_game_name: match &hand.table_info.table_name {
-                parser::TableName::CashGame(name) => Some(name.to_owned()),
-                _ => None,
-            },
-            datetime: hand.hand_info.datetime.to_string(),
-        });
-        for street in hand.streets.iter() {
-            street
-                .actions
-                .iter()
-                .filter(|action| {
-                    action.action != ActionType::Collect && action.action != ActionType::Shows
+    let mut nb_hands = 0;
+    conn.transaction::<_, Error, _>(|conn| {
+        for hand in &hands_vec {
+            let inserted = diesel::insert_or_ignore_into(hands::table)
+                .values(Hand {
+                    id: hand.hand_info.hand_id.to_owned(),
+                    hole_card_1: hand.dealt_cards.hole_cards.card1.to_string(),
+                    hole_card_2: hand.dealt_cards.hole_cards.card2.to_string(),
+                    tournament_id: match &hand.table_info.table_name {
+                        parser::TableName::Tournament(_, tournament_id_, _) => {
+                            Some(*tournament_id_ as i32)
+                        }
+                        _ => None,
+                    },
+                    cash_game_name: match &hand.table_info.table_name {
+                        parser::TableName::CashGame(name) => Some(name.to_owned()),
+                        _ => None,
+                    },
+                    datetime: hand.hand_info.datetime.to_string(),
                 })
-                .for_each(|action| {
-                    new_actions.push(NewAction {
-                        hand_id: hand.hand_info.hand_id.to_owned(),
-                        player_name: action.player_name.to_owned(),
-                        action_type: action.action.to_string(),
-                        amount: match action.action {
-                            ActionType::Bet { amount } => Some(amount),
-                            ActionType::Call { amount } => Some(amount),
-                            ActionType::Raise { amount, .. } => Some(amount),
-                            _ => None,
-                        },
-                        is_all_in: action.is_all_in as i32,
-                        street: street.street_type.to_string(),
+                .execute(conn)
+                .expect("Error saving new hands");
+            if inserted == 0 {
+                continue;
+            }
+            nb_hands += 1;
+            for street in hand.streets.iter() {
+                street
+                    .actions
+                    .iter()
+                    .filter(|action| {
+                        action.action != ActionType::Collect && action.action != ActionType::Shows
                     })
-                });
+                    .for_each(|action| {
+                        new_actions.push(NewAction {
+                            hand_id: hand.hand_info.hand_id.to_owned(),
+                            player_name: action.player_name.to_owned(),
+                            action_type: action.action.to_string(),
+                            amount: match action.action {
+                                ActionType::Bet { amount } => Some(amount),
+                                ActionType::Call { amount } => Some(amount),
+                                ActionType::Raise { amount, .. } => Some(amount),
+                                _ => None,
+                            },
+                            is_all_in: action.is_all_in as i32,
+                            street: street.street_type.to_string(),
+                        })
+                    });
+            }
         }
-    }
-    diesel::insert_or_ignore_into(hands::table)
-        .values(&new_hands)
-        .execute(conn)
-        .expect("Error saving new hands");
-    diesel::insert_or_ignore_into(actions::table)
-        .values(&new_actions)
-        .execute(conn)
-        .expect("Error saving new hands");
-    new_hands.len() as u32
+        diesel::insert_or_ignore_into(actions::table)
+            .values(&new_actions)
+            .execute(conn)
+            .expect("Error saving new hands");
+        Ok(())
+    })
+    .map_err(|_| "Error inserting hands")?;
+    Ok(nb_hands)
 }
 
 pub fn get_hands(url: &str) -> Vec<Hand> {
