@@ -45,7 +45,6 @@ pub fn get_summaries(url: &str) -> Vec<Summary> {
 }
 
 pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -> u32 {
-    // let new_hands: Vec<Hand> = hands_vec
     let mut new_hands: Vec<Hand> = vec![];
     let mut new_actions: Vec<NewAction> = vec![];
     for hand in &hands_vec {
@@ -64,21 +63,27 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
             datetime: hand.hand_info.datetime.to_string(),
         });
         for street in hand.streets.iter() {
-            street.actions.iter().for_each(|action| {
-                new_actions.push(NewAction {
-                    hand_id: hand.hand_info.hand_id.to_owned(),
-                    player_name: action.player_name.to_owned(),
-                    action_type: action.action.to_string(),
-                    amount: match action.action {
-                        ActionType::Bet { amount } => Some(amount),
-                        ActionType::Call { amount } => Some(amount),
-                        ActionType::Raise { amount, .. } => Some(amount),
-                        _ => None,
-                    },
-                    is_all_in: action.is_all_in as i32,
-                    street: street.street_type.to_string(),
+            street
+                .actions
+                .iter()
+                .filter(|action| {
+                    action.action != ActionType::Collect && action.action != ActionType::Shows
                 })
-            });
+                .for_each(|action| {
+                    new_actions.push(NewAction {
+                        hand_id: hand.hand_info.hand_id.to_owned(),
+                        player_name: action.player_name.to_owned(),
+                        action_type: action.action.to_string(),
+                        amount: match action.action {
+                            ActionType::Bet { amount } => Some(amount),
+                            ActionType::Call { amount } => Some(amount),
+                            ActionType::Raise { amount, .. } => Some(amount),
+                            _ => None,
+                        },
+                        is_all_in: action.is_all_in as i32,
+                        street: street.street_type.to_string(),
+                    })
+                });
         }
     }
     diesel::insert_or_ignore_into(hands::table)
