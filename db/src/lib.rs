@@ -176,36 +176,23 @@ pub fn get_players(url: &str) -> Result<Vec<Player>, &'static str> {
         .collect())
 }
 
-pub fn get_players_for_table_cash(url: &str, table_name: String) -> Result<Vec<Player>, &str> {
-    let mut connection = establish_connection(url);
-    let hand_ids = hands::table
-        .filter(hands::cash_game_name.eq(table_name))
-        .select(Hand::as_select())
-        .get_results(&mut connection)
-        .map_err(|_| "Error getting players")?;
-
-    let action_vec: Vec<(String, i64)> = Action::belonging_to(&hand_ids)
-        .group_by(actions::dsl::player_name)
-        .select((
-            actions::dsl::player_name,
-            diesel::dsl::count(actions::hand_id),
-        ))
-        .load(&mut connection)
-        .map_err(|_| "Error getting players")?;
-    Ok(action_vec
-        .iter()
-        .map(|(n, c)| Player {
-            name: n.to_owned(),
-            nb_hands: *c,
-        })
-        .collect())
-}
-
-pub fn get_players_for_table_tournament(
+pub fn get_players_for_table(
     url: &str,
-    tournament_id_: i32,
+    tournament_id: Option<i32>,
+    cash_game_name: Option<String>,
 ) -> Result<Vec<Player>, &str> {
     let mut connection = establish_connection(url);
+    let mut query = hands::dsl::hands.into_boxed();
+    if let Some(tournament_id_) = tournament_id {
+        query = query.filter(hands::tournament_id.eq(tournament_id_ as i32));
+    }
+    if let Some(cash_game_name_) = cash_game_name {
+        query = query.filter(hands::cash_game_name.eq(cash_game_name_));
+    }
+    let hand: Hand = query
+        .order(hands::datetime.desc())
+        .first(&mut connection)
+        .map_err(|_| "Error getting hand")?;
     let (hands1, hands2) = diesel::alias!(hands as h1, hands as h2);
     let (actions1, actions2) = diesel::alias!(actions as a1, actions as a2);
     let players_vec: Vec<(String, i64)> = hands1
@@ -216,7 +203,7 @@ pub fn get_players_for_table_tournament(
                     .inner_join(
                         actions2.on(hands2.field(hands::id).eq(actions2.field(actions::hand_id))),
                     )
-                    .filter(hands2.field(hands::tournament_id).eq(tournament_id_))
+                    .filter(hands2.field(hands::id).eq(hand.id))
                     .select(actions2.field(actions::player_name))
                     .distinct(),
             ),
