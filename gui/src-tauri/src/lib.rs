@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use nom::branch::alt;
@@ -12,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, Window};
 use x11rb::rust_connection::RustConnection;
+
+use holdem_suite_db::models::Action;
 
 x11rb::atom_manager! {
     pub Atoms: AtomsCookie {
@@ -153,9 +156,124 @@ impl WindowManager {
     }
 }
 
+#[derive(Default)]
+struct PlayerMetrics {
+    vpip: bool,
+    pfr: bool,
+    three_bet: bool,
+}
+
+fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetrics> {
+    let mut metrics = HashMap::new();
+    let mut someone_raised = false;
+    let mut someone_three_bet = false;
+    for Action {
+        player_name,
+        street,
+        action_type,
+        ..
+    } in actions
+    {
+        let metric = metrics.entry(player_name).or_default();
+        if street != "preflop" {
+            return metrics;
+        }
+        match action_type.as_str() {
+            "raise" => {
+                if someone_raised && !someone_three_bet {
+                    metric.three_bet = true;
+                    someone_three_bet = true;
+                }
+                someone_raised = true;
+                metric.vpip = true;
+                metric.pfr = true;
+            }
+            "call" => {
+                metric.vpip = true;
+            }
+            "fold" => {}
+            _ => {}
+        }
+    }
+    metrics
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_compute_hand_metrics() {
+        let actions = vec![
+            Action {
+                id: 0,
+                hand_id: "whatever".to_owned(),
+                is_all_in: 0,
+                player_name: "Player 1".to_owned(),
+                street: "preflop".to_owned(),
+                action_type: "raise".to_owned(),
+                amount: Some(1.0),
+            },
+            Action {
+                id: 1,
+                hand_id: "whatever".to_owned(),
+                is_all_in: 0,
+                player_name: "Player 2".to_owned(),
+                street: "preflop".to_owned(),
+                action_type: "call".to_owned(),
+                amount: Some(1.0),
+            },
+            Action {
+                id: 2,
+                hand_id: "whatever".to_owned(),
+                is_all_in: 0,
+                player_name: "Player 3".to_owned(),
+                street: "preflop".to_owned(),
+                action_type: "fold".to_owned(),
+                amount: None,
+            },
+            Action {
+                id: 3,
+                hand_id: "whatever".to_owned(),
+                is_all_in: 0,
+                player_name: "Player 4".to_owned(),
+                street: "preflop".to_owned(),
+                action_type: "raise".to_owned(),
+                amount: Some(3.0),
+            },
+            Action {
+                id: 4,
+                hand_id: "whatever".to_owned(),
+                is_all_in: 0,
+                player_name: "Player 1".to_owned(),
+                street: "preflop".to_owned(),
+                action_type: "fold".to_owned(),
+                amount: None,
+            },
+            Action {
+                id: 5,
+                hand_id: "whatever".to_owned(),
+                is_all_in: 0,
+                player_name: "Player 1".to_owned(),
+                street: "preflop".to_owned(),
+                action_type: "fold".to_owned(),
+                amount: None,
+            },
+        ];
+        let metrics = compute_hand_metrics(actions);
+        assert!(metrics["Player 1"].vpip);
+        assert!(metrics["Player 1"].pfr);
+        assert!(!metrics["Player 1"].three_bet);
+        assert!(metrics["Player 2"].vpip);
+        assert!(!metrics["Player 2"].pfr);
+        assert!(!metrics["Player 2"].three_bet);
+        assert!(!metrics["Player 3"].vpip);
+        assert!(!metrics["Player 3"].pfr);
+        assert!(!metrics["Player 3"].three_bet);
+        assert!(metrics["Player 4"].vpip);
+        assert!(metrics["Player 4"].pfr);
+        assert!(metrics["Player 4"].three_bet);
+    }
 
     #[test]
     fn test_parse_tournament() {
