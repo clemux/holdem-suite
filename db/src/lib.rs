@@ -164,6 +164,14 @@ pub fn get_actions(url: &str, hand_id: String) -> Vec<Action> {
     }
 }
 
+pub fn get_actions_for_player(url: &str, player_name: String) -> Result<Vec<Action>, &'static str> {
+    let mut connection = establish_connection(url);
+    actions::table
+        .filter(actions::player_name.eq(player_name))
+        .load(&mut connection)
+        .map_err(|e| "Error getting actions for player")
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Player {
     pub name: String,
@@ -196,11 +204,11 @@ pub fn get_players_for_table(
 ) -> Result<Vec<Player>, &str> {
     let mut connection = establish_connection(url);
     let mut query = hands::dsl::hands.into_boxed();
-    if let Some(tournament_id_) = tournament_id {
-        query = query.filter(hands::tournament_id.eq(tournament_id_ as i32));
+    if let Some(tournament_id) = tournament_id {
+        query = query.filter(hands::tournament_id.eq(tournament_id));
     }
-    if let Some(cash_game_name_) = cash_game_name {
-        query = query.filter(hands::cash_game_name.eq(cash_game_name_));
+    if let Some(cash_game_name) = cash_game_name {
+        query = query.filter(hands::cash_game_name.eq(cash_game_name));
     }
     let hand: Hand = query
         .order(hands::datetime.desc())
