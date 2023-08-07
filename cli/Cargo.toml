@@ -10,4 +10,5 @@ holdem_suite_parser = { path = "../parser" }
 holdem_suite_db = { path = "../db" }
 clap = { version = "4.3.19", features = ["derive"] }
 notify = "6.0.1"
+anyhow = "1.0.72"
 

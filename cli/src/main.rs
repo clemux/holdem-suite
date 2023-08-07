@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use notify::EventKind;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
@@ -35,7 +36,7 @@ fn parse(path: Vec<PathBuf>) {
     println!("Parsed {} files in {:?}", count, start.elapsed());
 }
 
-fn parse_file(path: PathBuf) {
+fn parse_file(path: PathBuf) -> Result<()> {
     let db_path = match std::env::var("DATABASE_URL") {
         Ok(val) => val,
         Err(_) => String::from("sqlite:///home/clemux/dev/holdem-suite/tracker.db"),
@@ -53,12 +54,13 @@ fn parse_file(path: PathBuf) {
         let start = Instant::now();
         match parse_result {
             Ok((_, hands)) => {
-                let nb_hands = insert_hands(connection, hands);
+                let nb_hands = insert_hands(connection, hands).map_err(|e| anyhow::anyhow!(e))?;
                 println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
             }
             Err(e) => println!("{}", e),
         }
     }
+    Ok(())
 }
 
 fn watch<P: AsRef<Path>>(path: P) {
