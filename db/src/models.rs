@@ -58,3 +58,14 @@ pub struct NewAction {
     pub is_all_in: i32,
     pub street: String,
 }
+
+#[derive(Identifiable, Queryable, Selectable, Associations, Debug, Serialize)]
+#[diesel(table_name = crate::schema::seats)]
+#[diesel(belongs_to(Hand))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[diesel(treat_none_as_default_value = false)]
+pub struct Seat {
+    pub hand_id: String,
+    pub player_name: String,
+    pub stack: i32,
+}

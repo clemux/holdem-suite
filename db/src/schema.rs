@@ -24,6 +24,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    seats (hand_id, seat_number) {
+        hand_id -> Text,
+        player_name -> Text,
+        seat_number -> Integer,
+    }
+}
+
+diesel::table! {
     summaries (id) {
         id -> Integer,
         name -> Text,
@@ -32,9 +40,11 @@ diesel::table! {
 }
 
 diesel::joinable!(actions -> hands (hand_id));
+diesel::joinable!(seats -> hands (hand_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     actions,
     hands,
+    seats,
     summaries,
 );

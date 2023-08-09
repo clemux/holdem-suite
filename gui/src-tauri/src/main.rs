@@ -54,6 +54,24 @@ fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, &'static s
     holdem_suite_db::get_players(state.database_url)
 }
 
+struct PlayerStats {
+    vpip: f32,
+    pfr: f32,
+    three_bet: f32,
+}
+
+#[tauri::command]
+fn load_player_stats(
+    player_name: String,
+    state: tauri::State<Settings>,
+) -> Result<PlayerStats, &'static str> {
+    Ok(PlayerStats {
+        vpip: 0.0,
+        pfr: 0.0,
+        three_bet: 0.0,
+    })
+}
+
 #[tauri::command]
 fn load_players_for_table(
     state: tauri::State<Settings>,
@@ -139,7 +157,7 @@ fn parse_file(path: PathBuf) {
         let parse_result = parse_hands(&data);
         match parse_result {
             Ok((_, hands)) => {
-                let nb_hands = insert_hands(connection, hands);
+                let nb_hands = insert_hands(connection, hands).unwrap();
                 println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
             }
             Err(_) => println!("Error parsing {}", path_str),
