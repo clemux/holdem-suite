@@ -256,10 +256,10 @@ impl TableInfo {
 
 #[derive(Debug, PartialEq)]
 pub struct Seat {
-    seat_number: u32,
-    player_name: String,
-    stack: f64,
-    bounty: Option<f64>,
+    pub seat_number: u32,
+    pub player_name: String,
+    pub stack: f64,
+    pub bounty: Option<f64>,
 }
 
 impl Seat {
@@ -268,7 +268,7 @@ impl Seat {
             terminated(double, opt(tag("€"))),
             opt(preceded(
                 tag(", "),
-                terminated(double, opt(tag("€ bounty"))),
+                terminated(double, terminated(opt(tag("€")), tag(" bounty"))),
             )),
         ));
         let (input, (seat_number, _, player_name, _, (stack, bounty))) = tuple((
@@ -1047,6 +1047,19 @@ mod tests {
             player_name: String::from("WinterSound"),
             stack: 20000.0,
             bounty: Some(0.45),
+        };
+        let (_, actual) = Seat::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_seat_chips_with_bounty_play_money() {
+        let input = "Seat 5: WinterSound (20000, 13.50 bounty)\n";
+        let expected = Seat {
+            seat_number: 5,
+            player_name: String::from("WinterSound"),
+            stack: 20000.0,
+            bounty: Some(13.50),
         };
         let (_, actual) = Seat::parse(input).unwrap();
         assert_eq!(expected, actual);
