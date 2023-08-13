@@ -189,6 +189,15 @@ pub fn get_actions(conn: &mut SqliteConnection, hand_id: String) -> Vec<Action> 
     }
 }
 
+pub fn get_actions_for_hand(conn: &mut SqliteConnection, hand_id: &str) -> Result<Vec<Action>> {
+    let actions = actions::dsl::actions
+        .filter(actions::dsl::hand_id.eq(hand_id))
+        .filter(actions::dsl::action_type.ne("collect"))
+        .select(Action::as_select())
+        .load(conn)?;
+    Ok(actions)
+}
+
 pub fn get_actions_for_player(
     conn: &mut SqliteConnection,
     player_name: String,
