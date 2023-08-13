@@ -3,7 +3,7 @@
 import PlayerHud from "./PlayerHud.vue";
 import {invoke} from "@tauri-apps/api/tauri";
 import {onMounted, ref} from "vue";
-import {Table} from "../lib/types";
+import {Player, Table} from "../lib/types";
 import {listen} from "@tauri-apps/api/event";
 import type {Event} from '@tauri-apps/api/event'
 
@@ -11,7 +11,7 @@ const props = defineProps<{
   table: Table;
 }>();
 
-const players = ref([]);
+const players = ref<Player[]>([]);
 
 async function loadPlayers() {
   players.value = await invoke("load_players_for_table", {table: props.table.rs_table});
@@ -39,7 +39,6 @@ onMounted(() => {
 </script>
 
 <template>
-  <button @click="loadPlayers">Load</button>
   <h5>{{table.name}}</h5>
   <div v-for="player in players">
     <PlayerHud :player="player" />
