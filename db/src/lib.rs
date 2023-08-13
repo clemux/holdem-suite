@@ -89,9 +89,7 @@ pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -
                 street
                     .actions
                     .iter()
-                    .filter(|action| {
-                        action.action != ActionType::Collect && action.action != ActionType::Shows
-                    })
+                    .filter(|action| action.action != ActionType::Shows)
                     .for_each(|action| {
                         new_actions.push(NewAction {
                             hand_id: hand.hand_info.hand_id.to_owned(),
