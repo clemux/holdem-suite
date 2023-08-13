@@ -10,12 +10,11 @@ use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
-use gui::{Table, WindowManager};
-use holdem_suite_db::models::{Action, Hand, Summary};
+use gui::{compute_hand_metrics, Table, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
-    establish_connection, get_actions, get_hands, get_latest_hand, get_summaries, insert_hands,
-    insert_summary, Player,
+    establish_connection, get_actions, get_hands, get_hands_for_player, get_latest_hand, get_seats,
+    get_summaries, insert_hands, insert_summary, Player,
 };
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser;
@@ -63,6 +62,7 @@ fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, &'static s
     holdem_suite_db::get_players(state.database_url)
 }
 
+#[derive(Serialize)]
 struct PlayerStats {
     vpip: f32,
     pfr: f32,
@@ -74,10 +74,31 @@ fn load_player_stats(
     player_name: String,
     state: tauri::State<Settings>,
 ) -> Result<PlayerStats, &'static str> {
-    Ok(PlayerStats {
+    let mut stats = PlayerStats {
         vpip: 0.0,
         pfr: 0.0,
         three_bet: 0.0,
+    };
+    let hands_actions =
+        get_hands_for_player(state.database_url, player_name.as_str()).map_err(|e| {
+            eprintln!(
+                "Error while loading hands for player {}: {}",
+                player_name, e
+            );
+            "Error while loading hands for player"
+        })?;
+    let nb_hands = hands_actions.len();
+    for (_, actions) in hands_actions {
+        let metrics = compute_hand_metrics(actions)[&player_name];
+        stats.vpip += metrics.vpip as u32 as f32;
+        stats.pfr += metrics.pfr as u32 as f32;
+        stats.three_bet += metrics.three_bet as u32 as f32;
+    }
+
+    Ok(PlayerStats {
+        vpip: stats.vpip / nb_hands as f32,
+        pfr: stats.pfr / nb_hands as f32,
+        three_bet: stats.three_bet / nb_hands as f32,
     })
 }
 
@@ -256,6 +277,7 @@ fn main() {
             get_latest_actions,
             load_players,
             load_players_for_table,
+            load_player_stats,
             load_seats,
         ])
         .manage(settings)

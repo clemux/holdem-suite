@@ -156,14 +156,14 @@ impl WindowManager {
     }
 }
 
-#[derive(Default)]
-struct PlayerMetrics {
-    vpip: bool,
-    pfr: bool,
-    three_bet: bool,
+#[derive(Default, Debug, Clone, Copy)]
+pub struct PlayerMetrics {
+    pub vpip: bool,
+    pub pfr: bool,
+    pub three_bet: bool,
 }
 
-fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetrics> {
+pub fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetrics> {
     let mut metrics = HashMap::new();
     let mut someone_raised = false;
     let mut someone_three_bet = false;
