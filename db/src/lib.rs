@@ -38,11 +38,10 @@ pub fn insert_summary(conn: &mut SqliteConnection, summary: summary_parser::Tour
         .expect("Error saving new summary");
 }
 
-pub fn get_summaries(url: &str) -> Vec<Summary> {
-    let mut connection = establish_connection(url);
+pub fn get_summaries(conn: &mut SqliteConnection) -> Vec<Summary> {
     summaries::dsl::summaries
         .select(Summary::as_select())
-        .load(&mut connection)
+        .load(conn)
         .expect("Error loading summaries")
 }
 
@@ -132,12 +131,8 @@ pub fn get_seats(conn: &mut SqliteConnection, hand_id: &str) -> Result<Vec<Seat>
     Ok(seats)
 }
 
-pub fn get_hands(url: &str) -> Vec<Hand> {
-    let mut connection = establish_connection(url);
-    match hands::dsl::hands
-        .select(Hand::as_select())
-        .load(&mut connection)
-    {
+pub fn get_hands(conn: &mut SqliteConnection) -> Vec<Hand> {
+    match hands::dsl::hands.select(Hand::as_select()).load(conn) {
         Ok(hands_) => hands_,
         Err(e) => {
             println!("Error getting hands: {}", e);
@@ -146,16 +141,18 @@ pub fn get_hands(url: &str) -> Vec<Hand> {
     }
 }
 
-pub fn get_hands_for_player(url: &str, player_name: &str) -> Result<Vec<(Hand, Vec<Action>)>> {
-    let mut connection = establish_connection(url);
+pub fn get_hands_for_player(
+    conn: &mut SqliteConnection,
+    player_name: &str,
+) -> Result<Vec<(Hand, Vec<Action>)>> {
     let hands = hands::dsl::hands
         .inner_join(seats::dsl::seats)
         .filter(seats::dsl::player_name.eq(player_name))
         .select(Hand::as_select())
-        .load(&mut connection)?;
+        .load(conn)?;
     let actions = Action::belonging_to(&hands)
         .select(Action::as_select())
-        .load(&mut connection)?;
+        .load(conn)?;
     let hand_actions = actions
         .grouped_by(&hands)
         .into_iter()
@@ -166,11 +163,10 @@ pub fn get_hands_for_player(url: &str, player_name: &str) -> Result<Vec<(Hand, V
 }
 
 pub fn get_latest_hand(
-    url: &str,
+    conn: &mut SqliteConnection,
     tournament_id: Option<u32>,
     cash_game_name: Option<String>,
 ) -> Option<Hand> {
-    let mut connection = establish_connection(url);
     let mut query = hands::dsl::hands.into_boxed();
     if let Some(tournament_id_) = tournament_id {
         query = query.filter(hands::tournament_id.eq(tournament_id_ as i32));
@@ -178,11 +174,7 @@ pub fn get_latest_hand(
     if let Some(cash_game_name_) = cash_game_name {
         query = query.filter(hands::cash_game_name.eq(cash_game_name_));
     }
-    match query
-        .order(hands::datetime.desc())
-        .first(&mut connection)
-        .optional()
-    {
+    match query.order(hands::datetime.desc()).first(conn).optional() {
         Ok(hand) => hand,
         Err(e) => {
             println!("Error getting latest hand: {}", e);
@@ -191,11 +183,10 @@ pub fn get_latest_hand(
     }
 }
 
-pub fn get_actions(url: &str, hand_id: String) -> Vec<Action> {
-    let mut connection = establish_connection(url);
+pub fn get_actions(conn: &mut SqliteConnection, hand_id: String) -> Vec<Action> {
     match actions::table
         .filter(actions::hand_id.eq(hand_id))
-        .load(&mut connection)
+        .load(conn)
     {
         Ok(actions) => actions,
         Err(e) => {
@@ -205,11 +196,13 @@ pub fn get_actions(url: &str, hand_id: String) -> Vec<Action> {
     }
 }
 
-pub fn get_actions_for_player(url: &str, player_name: String) -> Result<Vec<Action>, &'static str> {
-    let mut connection = establish_connection(url);
+pub fn get_actions_for_player(
+    conn: &mut SqliteConnection,
+    player_name: String,
+) -> Result<Vec<Action>, &'static str> {
     actions::table
         .filter(actions::player_name.eq(player_name))
-        .load(&mut connection)
+        .load(conn)
         .map_err(|e| "Error getting actions for player")
 }
 
@@ -219,15 +212,14 @@ pub struct Player {
     pub nb_hands: i64,
 }
 
-pub fn get_players(url: &str) -> Result<Vec<Player>, &'static str> {
-    let mut connection = establish_connection(url);
+pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>, &'static str> {
     let action_vec: Vec<(String, i64)> = actions::table
         .group_by(actions::dsl::player_name)
         .select((
             actions::dsl::player_name,
             diesel::dsl::count(actions::hand_id),
         ))
-        .load(&mut connection)
+        .load(conn)
         .map_err(|_| "Error getting players")?;
     Ok(action_vec
         .iter()
@@ -239,11 +231,10 @@ pub fn get_players(url: &str) -> Result<Vec<Player>, &'static str> {
 }
 
 pub fn get_players_for_table(
-    url: &str,
+    conn: &mut SqliteConnection,
     tournament_id: Option<i32>,
     cash_game_name: Option<String>,
 ) -> Result<Vec<Player>, &str> {
-    let mut connection = establish_connection(url);
     let mut query = hands::dsl::hands.into_boxed();
     if let Some(tournament_id) = tournament_id {
         query = query.filter(hands::tournament_id.eq(tournament_id));
@@ -253,7 +244,7 @@ pub fn get_players_for_table(
     }
     let hand: Hand = query
         .order(hands::datetime.desc())
-        .first(&mut connection)
+        .first(conn)
         .map_err(|_| "Error getting hand")?;
     let (hands1, hands2) = diesel::alias!(hands as h1, hands as h2);
     let (actions1, actions2) = diesel::alias!(actions as a1, actions as a2);
@@ -275,7 +266,7 @@ pub fn get_players_for_table(
             actions1.field(actions::dsl::player_name),
             diesel::dsl::count_distinct(hands1.field(hands::id)),
         ))
-        .load(&mut connection)
+        .load(conn)
         .map_err(|_| "Error getting players")?;
     Ok(players_vec
         .into_iter()

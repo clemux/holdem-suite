@@ -13,8 +13,8 @@ use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilde
 use gui::{compute_hand_metrics, Table, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
-    establish_connection, get_actions, get_hands, get_hands_for_player, get_latest_hand, get_seats,
-    get_summaries, insert_hands, insert_summary, Player,
+    establish_connection, get_actions, get_hands, get_hands_for_player, get_latest_hand,
+    get_players_for_table, get_seats, get_summaries, insert_hands, insert_summary, Player,
 };
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser;
@@ -42,12 +42,14 @@ struct Payload {
 
 #[tauri::command]
 fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
-    get_summaries(state.database_url)
+    let mut conn = establish_connection(state.database_url);
+    get_summaries(&mut conn)
 }
 
 #[tauri::command]
 fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
-    get_hands(state.database_url)
+    let mut conn = establish_connection(state.database_url);
+    get_hands(&mut conn)
 }
 
 #[tauri::command]
@@ -59,7 +61,8 @@ fn load_seats(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Seat>,
 
 #[tauri::command]
 fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, &'static str> {
-    holdem_suite_db::get_players(state.database_url)
+    let mut conn = establish_connection(state.database_url);
+    holdem_suite_db::get_players(&mut conn)
 }
 
 #[derive(Serialize)]
@@ -74,19 +77,19 @@ fn load_player_stats(
     player_name: String,
     state: tauri::State<Settings>,
 ) -> Result<PlayerStats, &'static str> {
+    let mut conn = establish_connection(state.database_url);
     let mut stats = PlayerStats {
         vpip: 0.0,
         pfr: 0.0,
         three_bet: 0.0,
     };
-    let hands_actions =
-        get_hands_for_player(state.database_url, player_name.as_str()).map_err(|e| {
-            eprintln!(
-                "Error while loading hands for player {}: {}",
-                player_name, e
-            );
-            "Error while loading hands for player"
-        })?;
+    let hands_actions = get_hands_for_player(&mut conn, player_name.as_str()).map_err(|e| {
+        eprintln!(
+            "Error while loading hands for player {}: {}",
+            player_name, e
+        );
+        "Error while loading hands for player"
+    })?;
     let nb_hands = hands_actions.len();
     for (_, actions) in hands_actions {
         let metrics = compute_hand_metrics(actions)[&player_name];
@@ -107,27 +110,28 @@ fn load_players_for_table(
     state: tauri::State<Settings>,
     table: Table,
 ) -> Result<Vec<Player>, &'static str> {
+    let mut conn = establish_connection(state.database_url);
     match table {
         Table::CashGame(name) => {
-            holdem_suite_db::get_players_for_table(state.database_url, None, Some(name))
+            // cannot return value referencing local variable `conn` [E0515] returns
+            // a value referencing data owned by the current function
+            get_players_for_table(&mut conn, None, Some(name))
         }
-        Table::Tournament { id, .. } => {
-            holdem_suite_db::get_players_for_table(state.database_url, Some(id as i32), None)
-        }
+        Table::Tournament { id, .. } => get_players_for_table(&mut conn, Some(id as i32), None),
         _ => Err("Invalid table type"),
     }
 }
 
 #[tauri::command]
 fn get_latest_actions(table: Table, state: tauri::State<Settings>) -> Vec<Action> {
-    println!("{:?}", table);
+    let mut conn = establish_connection(state.database_url);
     match table {
-        Table::CashGame(name) => match get_latest_hand(state.database_url, None, Some(name)) {
-            Some(hand) => return get_actions(state.database_url, hand.id),
+        Table::CashGame(name) => match get_latest_hand(&mut conn, None, Some(name)) {
+            Some(hand) => return get_actions(&mut conn, hand.id),
             None => return vec![],
         },
-        Table::Tournament { id, .. } => match get_latest_hand(state.database_url, Some(id), None) {
-            Some(hand) => return get_actions(state.database_url, hand.id),
+        Table::Tournament { id, .. } => match get_latest_hand(&mut conn, Some(id), None) {
+            Some(hand) => return get_actions(&mut conn, hand.id),
             None => return vec![],
         },
         Table::PendingTournament { id, .. } => {
