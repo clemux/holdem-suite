@@ -59,13 +59,16 @@ pub struct NewAction {
     pub street: String,
 }
 
-#[derive(Identifiable, Queryable, Selectable, Associations, Debug, Serialize)]
+#[derive(Identifiable, Insertable, Queryable, Selectable, Associations, Debug, Serialize)]
 #[diesel(table_name = crate::schema::seats)]
 #[diesel(belongs_to(Hand))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[diesel(treat_none_as_default_value = false)]
+#[diesel(primary_key(hand_id, player_name))]
 pub struct Seat {
     pub hand_id: String,
     pub player_name: String,
-    pub stack: i32,
+    pub seat_number: i32,
+    pub stack: f64,
+    pub bounty: Option<f64>,
 }

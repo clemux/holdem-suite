@@ -1,3 +1,4 @@
+use anyhow::Result;
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
@@ -8,7 +9,7 @@ use holdem_suite_parser::parser;
 use holdem_suite_parser::parser::ActionType;
 use holdem_suite_parser::summary_parser;
 
-use crate::models::{Action, Hand, NewAction, Summary};
+use crate::models::{Action, Hand, NewAction, Seat, Summary};
 use crate::schema::*;
 
 pub mod models;
@@ -76,6 +77,18 @@ pub fn insert_hands(
                 continue;
             }
             nb_hands += 1;
+            for seat in hand.seats.iter() {
+                diesel::insert_or_ignore_into(seats::table)
+                    .values(Seat {
+                        hand_id: hand.hand_info.hand_id.to_owned(),
+                        player_name: seat.player_name.to_owned(),
+                        seat_number: seat.seat_number as i32,
+                        stack: seat.stack,
+                        bounty: seat.bounty,
+                    })
+                    .execute(conn)
+                    .expect("Error saving seat");
+            }
             for street in hand.streets.iter() {
                 street
                     .actions
@@ -110,6 +123,15 @@ pub fn insert_hands(
     Ok(nb_hands)
 }
 
+pub fn get_seats(conn: &mut SqliteConnection, hand_id: &str) -> Result<Vec<Seat>, &'static str> {
+    let seats = seats::dsl::seats
+        .filter(seats::dsl::hand_id.eq(hand_id))
+        .select(Seat::as_select())
+        .load(conn)
+        .map_err(|_| "Error getting seats")?;
+    Ok(seats)
+}
+
 pub fn get_hands(url: &str) -> Vec<Hand> {
     let mut connection = establish_connection(url);
     match hands::dsl::hands
@@ -122,6 +144,25 @@ pub fn get_hands(url: &str) -> Vec<Hand> {
             vec![]
         }
     }
+}
+
+pub fn get_hands_for_player(url: &str, player_name: &str) -> Result<Vec<(Hand, Vec<Action>)>> {
+    let mut connection = establish_connection(url);
+    let hands = hands::dsl::hands
+        .inner_join(seats::dsl::seats)
+        .filter(seats::dsl::player_name.eq(player_name))
+        .select(Hand::as_select())
+        .load(&mut connection)?;
+    let actions = Action::belonging_to(&hands)
+        .select(Action::as_select())
+        .load(&mut connection)?;
+    let hand_actions = actions
+        .grouped_by(&hands)
+        .into_iter()
+        .zip(hands)
+        .map(|(actions, hand)| (hand, actions))
+        .collect::<Vec<(Hand, Vec<Action>)>>();
+    Ok(hand_actions)
 }
 
 pub fn get_latest_hand(

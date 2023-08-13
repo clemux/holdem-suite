@@ -28,6 +28,8 @@ diesel::table! {
         hand_id -> Text,
         player_name -> Text,
         seat_number -> Integer,
+        stack -> Double,
+        bounty -> Nullable<Double>,
     }
 }
 
