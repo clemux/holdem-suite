@@ -13,9 +13,9 @@ use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilde
 use gui::{compute_hand_metrics, Table, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
-    establish_connection, get_actions, get_hands, get_hands_for_player, get_latest_hand,
-    get_players, get_players_for_table, get_seats, get_summaries, insert_hands, insert_summary,
-    Player,
+    establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
+    get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, insert_hands,
+    insert_summary, Player,
 };
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser;
@@ -58,6 +58,13 @@ fn load_seats(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Seat>,
     let mut conn = establish_connection(state.database_url);
     let seats = get_seats(&mut conn, hand_id).map_err(|_| "Error loading seats")?;
     Ok(seats)
+}
+
+#[tauri::command]
+fn load_actions(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Action>, &'static str> {
+    let mut conn = establish_connection(state.database_url);
+    let actions = get_actions_for_hand(&mut conn, hand_id).map_err(|_| "Error loading actions")?;
+    Ok(actions)
 }
 
 #[tauri::command]
@@ -289,6 +296,7 @@ fn main() {
             load_players_for_table,
             load_player_stats,
             load_seats,
+            load_actions,
         ])
         .manage(settings)
         .run(tauri::generate_context!())

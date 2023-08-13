@@ -30,3 +30,13 @@ export type Seat = {
     stack: number,
     bounty: number|null,
 }
+
+export type Action = {
+    id: number,
+    hand_id: string,
+    player_name: string,
+    street: string,
+    action_type: string,
+    amount: number,
+    is_allin: boolean,
+}
