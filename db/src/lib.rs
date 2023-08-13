@@ -45,10 +45,7 @@ pub fn get_summaries(conn: &mut SqliteConnection) -> Vec<Summary> {
         .expect("Error loading summaries")
 }
 
-pub fn insert_hands(
-    conn: &mut SqliteConnection,
-    hands_vec: Vec<parser::Hand>,
-) -> Result<u32, &'static str> {
+pub fn insert_hands(conn: &mut SqliteConnection, hands_vec: Vec<parser::Hand>) -> Result<u32> {
     let mut new_actions: Vec<NewAction> = vec![];
     let mut nb_hands = 0;
     conn.transaction::<_, Error, _>(|conn| {
@@ -117,17 +114,15 @@ pub fn insert_hands(
             .execute(conn)
             .expect("Error saving new hands");
         Ok(())
-    })
-    .map_err(|_| "Error inserting hands")?;
+    })?;
     Ok(nb_hands)
 }
 
-pub fn get_seats(conn: &mut SqliteConnection, hand_id: &str) -> Result<Vec<Seat>, &'static str> {
+pub fn get_seats(conn: &mut SqliteConnection, hand_id: &str) -> Result<Vec<Seat>> {
     let seats = seats::dsl::seats
         .filter(seats::dsl::hand_id.eq(hand_id))
         .select(Seat::as_select())
-        .load(conn)
-        .map_err(|_| "Error getting seats")?;
+        .load(conn)?;
     Ok(seats)
 }
 
@@ -199,11 +194,10 @@ pub fn get_actions(conn: &mut SqliteConnection, hand_id: String) -> Vec<Action> 
 pub fn get_actions_for_player(
     conn: &mut SqliteConnection,
     player_name: String,
-) -> Result<Vec<Action>, &'static str> {
-    actions::table
+) -> Result<Vec<Action>> {
+    Ok(actions::table
         .filter(actions::player_name.eq(player_name))
-        .load(conn)
-        .map_err(|e| "Error getting actions for player")
+        .load(conn)?)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -212,15 +206,14 @@ pub struct Player {
     pub nb_hands: i64,
 }
 
-pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>, &'static str> {
+pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>> {
     let action_vec: Vec<(String, i64)> = actions::table
         .group_by(actions::dsl::player_name)
         .select((
             actions::dsl::player_name,
             diesel::dsl::count(actions::hand_id),
         ))
-        .load(conn)
-        .map_err(|_| "Error getting players")?;
+        .load(conn)?;
     Ok(action_vec
         .iter()
         .map(|(n, c)| Player {
@@ -234,7 +227,7 @@ pub fn get_players_for_table(
     conn: &mut SqliteConnection,
     tournament_id: Option<i32>,
     cash_game_name: Option<String>,
-) -> Result<Vec<Player>, &str> {
+) -> Result<Vec<Player>> {
     let mut query = hands::dsl::hands.into_boxed();
     if let Some(tournament_id) = tournament_id {
         query = query.filter(hands::tournament_id.eq(tournament_id));
@@ -242,10 +235,7 @@ pub fn get_players_for_table(
     if let Some(cash_game_name) = cash_game_name {
         query = query.filter(hands::cash_game_name.eq(cash_game_name));
     }
-    let hand: Hand = query
-        .order(hands::datetime.desc())
-        .first(conn)
-        .map_err(|_| "Error getting hand")?;
+    let hand: Hand = query.order(hands::datetime.desc()).first(conn)?;
     let (hands1, hands2) = diesel::alias!(hands as h1, hands as h2);
     let (actions1, actions2) = diesel::alias!(actions as a1, actions as a2);
     let players_vec: Vec<(String, i64)> = hands1
@@ -266,8 +256,7 @@ pub fn get_players_for_table(
             actions1.field(actions::dsl::player_name),
             diesel::dsl::count_distinct(hands1.field(hands::id)),
         ))
-        .load(conn)
-        .map_err(|_| "Error getting players")?;
+        .load(conn)?;
     Ok(players_vec
         .into_iter()
         .map(|(name, nb_hands)| Player { name, nb_hands })

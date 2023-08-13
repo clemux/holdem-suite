@@ -54,7 +54,7 @@ fn parse_file(path: PathBuf) -> Result<()> {
         let start = Instant::now();
         match parse_result {
             Ok((_, hands)) => {
-                let nb_hands = insert_hands(connection, hands).map_err(|e| anyhow::anyhow!(e))?;
+                let nb_hands = insert_hands(connection, hands)?;
                 println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
             }
             Err(e) => println!("{}", e),
