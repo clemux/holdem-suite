@@ -4,6 +4,8 @@ import type {Event} from '@tauri-apps/api/event'
 import {listen} from "@tauri-apps/api/event";
 import {invoke} from "@tauri-apps/api/tauri";
 import {QTableColumn} from "quasar";
+import {Hand} from "../lib/types.ts";
+import HandView from "./HandView.vue";
 
 const columns: QTableColumn[] = [
   {
@@ -20,12 +22,14 @@ const columns: QTableColumn[] = [
   {name: 'datetime', label: 'Date', field: 'datetime', sortable: true}
 ]
 
-const rows = ref([]);
+const hands = ref([]);
+const splitterModel = ref<number>(50);
+const selectedHand = ref<Hand[]>([]);
 
 const initialPagination = {
   sortBy: 'datetime',
   descending: true,
-  rowsPerPage: 10
+  rowsPerPage: 5
 }
 
 async function listenWatcherEvent() {
@@ -43,21 +47,32 @@ onMounted(() => {
 })
 
 async function loadHands() {
-  rows.value = await invoke("load_hands", {});
+  hands.value = await invoke("load_hands", {});
 }
+
 </script>
 
 <template>
-  <div class="container">
-    <q-table
-        title="Hands"
-        :rows="rows"
-        :columns="columns"
-        row-key="name"
-        :pagination="initialPagination"
-    />
-    <form class="row" @submit.prevent="loadHands">
-      <button type="submit">Load</button>
-    </form>
-  </div>
+  <q-splitter
+      v-model="splitterModel"
+      horizontal
+  >
+    <template v-slot:before>
+      <q-table
+          title="Hands"
+          :rows="hands"
+          :columns="columns"
+          row-key="id"
+          :pagination="initialPagination"
+          selection="single"
+          v-model:selected="selectedHand"
+      />
+      <form class="row" @submit.prevent="loadHands">
+        <button type="submit">Load</button>
+      </form>
+    </template>
+    <template v-slot:after>
+      <HandView v-for="hand in selectedHand" :hand="hand" />
+    </template>
+  </q-splitter>
 </template>

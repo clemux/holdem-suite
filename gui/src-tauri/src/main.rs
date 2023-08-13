@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::{fs, thread};
 
+use anyhow::Result;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
 use gui::{Table, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Summary};
+use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_hands, get_latest_hand, get_summaries, insert_hands,
     insert_summary, Player,
@@ -47,6 +49,13 @@ fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
 #[tauri::command]
 fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
     get_hands(state.database_url)
+}
+
+#[tauri::command]
+fn load_seats(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Seat>, &'static str> {
+    let mut conn = establish_connection(state.database_url);
+    let seats = get_seats(&mut conn, hand_id)?;
+    Ok(seats)
 }
 
 #[tauri::command]
@@ -247,6 +256,7 @@ fn main() {
             get_latest_actions,
             load_players,
             load_players_for_table,
+            load_seats,
         ])
         .manage(settings)
         .run(tauri::generate_context!())
