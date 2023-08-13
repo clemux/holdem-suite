@@ -8,6 +8,12 @@ export type Player = {
   nb_hands: number,
 }
 
+export type PlayerStats = {
+    vpip: number,
+    pfr: number,
+    three_bet: number,
+}
+
 export type Hand = {
     id: string,
     hole_card_1: string,

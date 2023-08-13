@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::{fs, thread};
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
@@ -84,19 +84,20 @@ fn load_player_stats(
         pfr: 0.0,
         three_bet: 0.0,
     };
-    let hands_actions = get_hands_for_player(&mut conn, player_name.as_str()).map_err(|e| {
-        eprintln!(
-            "Error while loading hands for player {}: {}",
-            player_name, e
-        );
-        "Error while loading hands for player"
-    })?;
+    let hands_actions = get_hands_for_player(&mut conn, player_name.as_str())
+        .map_err(|e| "Error while loading hands for player")?;
     let nb_hands = hands_actions.len();
     for (_, actions) in hands_actions {
-        let metrics = compute_hand_metrics(actions)[&player_name];
-        stats.vpip += metrics.vpip as u32 as f32;
-        stats.pfr += metrics.pfr as u32 as f32;
-        stats.three_bet += metrics.three_bet as u32 as f32;
+        let metrics = compute_hand_metrics(actions);
+        let player_metrics = metrics.get(&player_name);
+        match player_metrics {
+            Some(metrics) => {
+                stats.vpip += metrics.vpip as u32 as f32;
+                stats.pfr += metrics.pfr as u32 as f32;
+                stats.three_bet += metrics.three_bet as u32 as f32;
+            }
+            None => continue,
+        }
     }
 
     Ok(PlayerStats {

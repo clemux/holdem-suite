@@ -23,6 +23,7 @@ const playerRows = ref<Player[]>([]);
 const tables = ref([]);
 const splitterModel = ref(90);
 const selectedPlayer = ref<Player[]>([]);
+const filterName = ref<string | null>(null);
 
 async function detectTables() {
   tables.value = await invoke("detect_tables", {});
@@ -70,7 +71,16 @@ async function selectPlayer() {
           selection="single"
           v-model:selected="selectedPlayer"
           @update:selected="selectPlayer"
-      />
+          :filter="filterName"
+      >
+        <template v-slot:top-right>
+          <q-input borderless dense debounce="300" v-model="filterName" placeholder="Search">
+            <template v-slot:append>
+              <q-icon name="search"/>
+            </template>
+          </q-input>
+        </template>
+      </q-table>
       <form class="row" @submit.prevent="loadPlayers">
         <button type="submit">Load players</button>
       </form>
