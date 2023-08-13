@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import {onMounted, ref} from "vue";
+import {onMounted, ref, watch} from "vue";
 import {Hand, Seat} from "../lib/types";
 import {invoke} from "@tauri-apps/api/tauri";
 
@@ -14,8 +14,11 @@ async function loadSeats() {
   seats.value = await invoke("load_seats", {handId: props.hand.id});
 }
 
+watch(() => props.hand, async (_, __) => {
+  await loadSeats();
+})
+
 onMounted(() => {
-  console.log(props.hand.datetime);
   loadSeats();
 })
 
