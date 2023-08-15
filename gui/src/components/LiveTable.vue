@@ -1,11 +1,11 @@
 <script setup lang="ts">
 
-import PlayerHud from "./PlayerHud.vue";
 import {invoke} from "@tauri-apps/api/tauri";
 import {onMounted, ref} from "vue";
 import {Player, Table} from "../lib/types";
 import {listen} from "@tauri-apps/api/event";
 import type {Event} from '@tauri-apps/api/event'
+import PlayerHudStats from "./PlayerHudStats.vue";
 
 const props = defineProps<{
   table: Table;
@@ -16,6 +16,10 @@ const players = ref<Player[]>([]);
 async function loadPlayers() {
   players.value = await invoke("load_players_for_table", {table: props.table.rs_table});
   console.log(players.value);
+}
+
+async function openHud(player: Player) {
+  await invoke("open_hud", {table: props.table.rs_table, player: player});
 }
 
 onMounted(() => {
@@ -41,7 +45,8 @@ onMounted(() => {
 <template>
   <h5>{{table.name}}</h5>
   <div v-for="player in players">
-    <PlayerHud :player="player" />
+    <PlayerHudStats :player="player" />
+    <button @click="openHud(player)">Open HUD</button>
   </div>
 </template>
 

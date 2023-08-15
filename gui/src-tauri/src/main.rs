@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::{fs, thread};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
@@ -39,6 +39,63 @@ struct Settings<'a> {
 #[derive(Clone, serde::Serialize)]
 struct Payload {
     message: String,
+}
+
+#[tauri::command]
+fn open_popup(player: Player, handle: AppHandle) -> Result<(), &'static str> {
+    let window = WindowBuilder::new(
+        &handle,
+        "popup",
+        tauri::WindowUrl::App("hud-popup.html".into()),
+    )
+    .decorations(false)
+    .inner_size(200.0, 50.0)
+    .resizable(false)
+    .build()
+    .map_err(|_| "Error creating popup")?;
+    let label = window.label().to_owned();
+    window.once("popupReady", move |msg| {
+        let window = handle.get_window(&label).unwrap();
+        window.emit("popup", player).unwrap();
+        println!("Received {:?}", msg);
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn open_hud(player: Player, table: Table, handle: AppHandle) -> Result<(), &'static str> {
+    println!("Opening HUD for {:?}", player);
+    let table_name = match table {
+        Table::CashGame(name) => name,
+        Table::Tournament { name, .. } => name,
+        Table::PendingTournament { name, .. } => name,
+    };
+    let window_label = format!("hud_{}_{}", table_name, player.name).replace(" ", "_");
+    println!("Window label: {}", window_label);
+    let window = WindowBuilder::new(
+        &handle,
+        window_label.to_owned(),
+        tauri::WindowUrl::App("hud.html".into()),
+    )
+    .decorations(false)
+    .inner_size(200.0, 60.0)
+    .resizable(true)
+    .always_on_top(true)
+    .build()
+    .map_err(|e| {
+        println!("Error creating popup {:?}", e);
+        "Error creating popup"
+    })?;
+    println!("Opened window {:?}", window.label());
+    let label = window_label.to_owned();
+    window.once("hudReady", move |msg| {
+        let window = handle.get_window(&label).unwrap();
+        window.emit("hud", player).unwrap();
+        println!("Received {:?}", msg);
+    });
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -301,6 +358,8 @@ fn main() {
             load_player_stats,
             load_seats,
             load_actions,
+            open_popup,
+            open_hud,
         ])
         .manage(settings)
         .run(tauri::generate_context!())

@@ -2,10 +2,8 @@
 import {onMounted, ref} from "vue";
 import {Player, PlayerStats} from "../lib/types";
 import {invoke} from "@tauri-apps/api/tauri";
-import {emit} from "@tauri-apps/api/event";
-import {appWindow} from "@tauri-apps/api/window";
+import {emit, listen} from "@tauri-apps/api/event";
 import PopupTitleBar from "./PopupTitleBar.vue";
-import PlayerHudStats from "./PlayerHudStats.vue";
 
 const stats = ref<PlayerStats | null>(null);
 const player = ref<Player | null>(null);
@@ -17,9 +15,8 @@ async function loadPlayerStats() {
   }
 }
 
-async function listenHudEvent() {
-  return await appWindow.listen<Player>('hud', (event) => {
-    console.log(event);
+async function listenPopupEvent() {
+  return await listen<Player>('popup', (event) => {
     player.value = event.payload;
     loadPlayerStats();
   })
@@ -27,16 +24,30 @@ async function listenHudEvent() {
 
 
 onMounted(() => {
-  listenHudEvent()
-  emit('hudReady')
+  listenPopupEvent()
+  emit('popupReady')
 
 });
 
 </script>
 
 <template>
+  <div>
   <PopupTitleBar/>
-  <PlayerHudStats v-if="player" :player="player" />
+  <table v-if="stats">
+    <tr v-if="player">
+      <td>{{ player.name }}</td>
+      <td>{{ player.nb_hands }}</td>
+    </tr>
+    <tr>
+      <td>
+        {{ stats.vpip.toFixed(2) }}
+      </td>
+      <td>{{ stats.pfr.toFixed(2) }}</td>
+      <td>{{ stats.three_bet.toFixed(2) }}</td>
+    </tr>
+  </table>
+  </div>
 </template>
 
 <style scoped>

@@ -16,6 +16,10 @@
       "shell": {
         "all": false,
         "open": true
+      },
+      "window": {
+        "create": true,
+        "close": true
       }
     },
     "bundle": {
