@@ -12,6 +12,7 @@ export type PlayerStats = {
     vpip: number,
     pfr: number,
     three_bet: number,
+    open_limp: number,
 }
 
 export type Hand = {

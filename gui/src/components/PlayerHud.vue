@@ -42,6 +42,7 @@ onMounted(() => {
       </td>
       <td>{{ stats.pfr.toFixed(2) }}</td>
       <td>{{ stats.three_bet.toFixed(2) }}</td>
+      <td>{{ stats.open_limp.toFixed(2) }}</td>
     </tr>
   </table>
 </template>

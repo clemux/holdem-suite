@@ -161,10 +161,12 @@ pub struct PlayerMetrics {
     pub vpip: bool,
     pub pfr: bool,
     pub three_bet: bool,
+    pub open_limp: bool,
 }
 
 pub fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetrics> {
     let mut metrics = HashMap::new();
+    let mut someone_limped = false;
     let mut someone_raised = false;
     let mut someone_three_bet = false;
     for Action {
@@ -190,6 +192,10 @@ pub fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetri
             }
             "call" => {
                 metric.vpip = true;
+                if !someone_raised && !someone_limped {
+                    metric.open_limp = true;
+                    someone_limped = true;
+                }
             }
             "fold" => {}
             _ => {}
