@@ -42,6 +42,26 @@ struct Payload {
 }
 
 #[tauri::command]
+fn open_popup(player: Player, handle: AppHandle) -> Result<(), &'static str> {
+    let window = WindowBuilder::new(
+        &handle,
+        "popup",
+        tauri::WindowUrl::App("hud-popup.html".into()),
+    )
+    .build()
+    .map_err(|_| "Error opening popup")?;
+    window.open_devtools();
+    let label = window.label().to_owned();
+    window.once("popupLoaded", move |msg| {
+        let window = handle.get_window(&label).unwrap();
+        window.emit("popup", player).unwrap();
+        println!("Received {:?}", msg);
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
 fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
     let mut conn = establish_connection(state.database_url);
     get_summaries(&mut conn)
@@ -301,6 +321,7 @@ fn main() {
             load_player_stats,
             load_seats,
             load_actions,
+            open_popup,
         ])
         .manage(settings)
         .run(tauri::generate_context!())

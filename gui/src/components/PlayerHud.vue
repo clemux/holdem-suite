@@ -4,8 +4,8 @@ import {Player, PlayerStats} from "../lib/types";
 import {invoke} from "@tauri-apps/api/tauri";
 import {onMounted, ref, watch} from "vue";
 
+import { WebviewWindow } from '@tauri-apps/api/window'
 const stats = ref<PlayerStats | null>(null);
-
 const props = defineProps<{
   player: Player;
 }>();
@@ -16,6 +16,28 @@ async function loadPlayerStats() {
 
 async function clickedTable() {
   console.log("clicked table");
+  const webview = new WebviewWindow('Popup', {
+  url: 'hud-popup.html',
+})
+  webview.once('tauri://created', function () {
+    console.log("Sending event");
+    webview.emit('load', { data: "cocuccocxc" })
+})
+
+  webview.once('tauri://error', function (e) {
+  console.log(e);
+})
+}
+
+async function sendSignal() {
+  console.log("Sending signal");
+  const window = WebviewWindow.getByLabel('Popup');
+  window.emit('load', { player: props.player });
+}
+
+async function openPopup() {
+  console.log("Opening popup");
+  await invoke("open_popup", {player: props.player});
 }
 
 watch(() => props.player, async (_, __) => {
@@ -45,6 +67,8 @@ onMounted(() => {
       <td>{{ stats.open_limp.toFixed(2) }}</td>
     </tr>
   </table>
+  <button @click="sendSignal()">Send signal</button>
+  <button @click="openPopup()">Open popup</button>
 </template>
 
 <style scoped>

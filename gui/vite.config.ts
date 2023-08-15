@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { resolve } from 'path';
 import vue from "@vitejs/plugin-vue";
 import { quasar, transformAssetUrls } from '@quasar/vite-plugin'
 
@@ -28,5 +29,12 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        hud: resolve(__dirname, 'hud.html'),
+        hud_popup: resolve(__dirname, 'hud-popup.html'),
+      },
+    }
   },
 }));
