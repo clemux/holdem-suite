@@ -207,7 +207,7 @@ pub fn get_actions_for_player(
         .load(conn)?)
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Player {
     pub name: String,
     pub nb_hands: i64,
