@@ -16,6 +16,10 @@ use x11rb::rust_connection::RustConnection;
 
 use holdem_suite_db::models::Action;
 
+use crate::errors::MyError;
+
+mod errors;
+
 x11rb::atom_manager! {
     pub Atoms: AtomsCookie {
         _NET_WM_NAME,
@@ -72,10 +76,19 @@ impl FromStr for Table {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WindowGeometry {
+    pub x: i16,
+    pub y: i16,
+    pub width: u16,
+    pub height: u16,
+}
+
 #[derive(Debug, Clone)]
 pub struct TableWindow {
     pub window: Window,
     pub table: Table,
+    pub position: WindowGeometry,
 }
 
 pub struct WindowManager {
@@ -141,6 +154,19 @@ impl WindowManager {
         }
     }
 
+    fn win_position(&self, win: Window) -> Result<WindowGeometry, MyError> {
+        let reply = self
+            .conn
+            .get_geometry(win)? // MyError::X11Connection
+            .reply()?; // MyError::X11Reply
+        Ok(WindowGeometry {
+            x: reply.x,
+            y: reply.y,
+            width: reply.width,
+            height: reply.height,
+        })
+    }
+
     pub fn table_windows(&self) -> Result<Vec<TableWindow>, &'static str> {
         let mut table_windows = vec![];
         for win in self.windows()? {
@@ -149,6 +175,9 @@ impl WindowManager {
                 table_windows.push(TableWindow {
                     window: win,
                     table: Table::from_str(&name).unwrap(),
+                    position: self
+                        .win_position(win)
+                        .map_err(|_| "error getting position")?,
                 });
             }
         }

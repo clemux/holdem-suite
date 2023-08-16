@@ -4,7 +4,6 @@ import {invoke} from "@tauri-apps/api/tauri";
 import {onMounted, ref} from "vue";
 import {Player, Table} from "../lib/types";
 import {listen} from "@tauri-apps/api/event";
-import type {Event} from '@tauri-apps/api/event'
 import PlayerHudStats from "./PlayerHudStats.vue";
 
 const props = defineProps<{
@@ -19,7 +18,8 @@ async function loadPlayers() {
 }
 
 async function openHud(player: Player) {
-  await invoke("open_hud", {table: props.table.rs_table, player: player});
+  console.log(props.table.window_position);
+  await invoke("open_hud", {table: props.table.rs_table, position: props.table.window_position, player: player});
 }
 
 onMounted(() => {
@@ -28,7 +28,7 @@ onMounted(() => {
 
 async function listenWatcherEvent() {
   try {
-    return await listen('watcher', (event: Event<any>) => {
+    return await listen('watcher', (_) => {
       loadPlayers();
     })
   } catch (e) {
@@ -43,9 +43,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <h5>{{table.name}}</h5>
+  <h5>{{ table.name }}</h5>
   <div v-for="player in players">
-    <PlayerHudStats :player="player" />
+    <PlayerHudStats :player="player"/>
     <button @click="openHud(player)">Open HUD</button>
   </div>
 </template>

@@ -10,7 +10,7 @@ use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
-use gui::{compute_hand_metrics, Table, WindowManager};
+use gui::{compute_hand_metrics, Table, WindowGeometry, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
@@ -64,14 +64,21 @@ fn open_popup(player: Player, handle: AppHandle) -> Result<(), &'static str> {
 }
 
 #[tauri::command]
-fn open_hud(player: Player, table: Table, handle: AppHandle) -> Result<(), &'static str> {
+fn open_hud(
+    player: Player,
+    table: Table,
+    position: WindowGeometry,
+    handle: AppHandle,
+) -> Result<(), &'static str> {
     println!("Opening HUD for {:?}", player);
     let table_name = match table {
         Table::CashGame(name) => name,
         Table::Tournament { name, .. } => name,
         Table::PendingTournament { name, .. } => name,
     };
-    let window_label = format!("hud_{}_{}", table_name, player.name).replace(" ", "_");
+    let window_label = format!("hud_{}_{}", table_name, player.name).replace(' ', "_");
+    let hud_x = position.x as f64 + position.width as f64 / 2.0;
+    let hud_y = position.y as f64 + position.height as f64 / 2.0;
     println!("Window label: {}", window_label);
     let window = WindowBuilder::new(
         &handle,
@@ -79,7 +86,8 @@ fn open_hud(player: Player, table: Table, handle: AppHandle) -> Result<(), &'sta
         tauri::WindowUrl::App("hud.html".into()),
     )
     .decorations(false)
-    .inner_size(200.0, 60.0)
+    .inner_size(200.0, 70.0)
+    .position(hud_x, hud_y)
     .resizable(true)
     .always_on_top(true)
     .build()
@@ -218,6 +226,7 @@ fn get_latest_actions(table: Table, state: tauri::State<Settings>) -> Vec<Action
 #[derive(Serialize)]
 struct TsTable {
     rs_table: Table,
+    window_position: WindowGeometry,
     name: String,
 }
 
@@ -235,6 +244,7 @@ fn detect_tables() -> Vec<TsTable> {
                 Table::Tournament { name, id, .. } => format!("{} ({})", name.to_owned(), id),
                 Table::PendingTournament { name, .. } => name.to_owned(),
             },
+            window_position: t.position.clone(),
         })
         .collect()
 }

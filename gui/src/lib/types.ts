@@ -1,11 +1,19 @@
+export type WindowPosition = {
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+}
+
 export type Table = {
-  name: string,
-  rs_table: object,
+    name: string,
+    rs_table: object,
+    window_position: WindowPosition,
 }
 
 export type Player = {
-  name: string,
-  nb_hands: number,
+    name: string,
+    nb_hands: number,
 }
 
 export type PlayerStats = {
@@ -29,7 +37,7 @@ export type Seat = {
     player_name: string,
     seat_number: number,
     stack: number,
-    bounty: number|null,
+    bounty: number | null,
 }
 
 export type Action = {
