@@ -15,6 +15,12 @@ use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, Window};
 use x11rb::rust_connection::RustConnection;
 
 use holdem_suite_db::models::Action;
+use holdem_suite_db::{establish_connection, insert_hands, insert_summary};
+use holdem_suite_parser::parser::parse_hands;
+use holdem_suite_parser::summary_parser;
+use std::fs;
+use std::path::PathBuf;
+use std::time::Instant;
 
 use crate::errors::MyError;
 
@@ -226,6 +232,32 @@ pub fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetri
         }
     }
     metrics
+}
+
+pub fn parse_file(path: PathBuf, database_url: &str) {
+    let connection = &mut establish_connection(database_url);
+    let path_cloned = path.clone();
+    let path_str = path_cloned.to_str().unwrap();
+    if path.clone().to_str().unwrap().contains("summary") {
+        let data = fs::read_to_string(path).expect("Unable to read file");
+        let parse_result = summary_parser::TournamentSummary::parse(&data);
+        match parse_result {
+            Ok((_, summary)) => insert_summary(connection, summary),
+            Err(_) => println!("Error parsing {}", path_str),
+        }
+    } else {
+        println!("Parsing {}", path_str);
+        let data = fs::read_to_string(path).expect("Unable to read file");
+        let start = Instant::now();
+        let parse_result = parse_hands(&data);
+        match parse_result {
+            Ok((_, hands)) => {
+                let nb_hands = insert_hands(connection, hands).unwrap();
+                println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
+            }
+            Err(_) => println!("Error parsing {}", path_str),
+        }
+    }
 }
 
 #[cfg(test)]

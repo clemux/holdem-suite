@@ -1,25 +1,20 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::path::{Path, PathBuf};
-use std::time::Instant;
-use std::{fs, thread};
+use std::path::Path;
+use std::thread;
 
 use anyhow::Result;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
-use gui::{compute_hand_metrics, Table, WindowGeometry, WindowManager};
+use gui::{compute_hand_metrics, parse_file, Table, WindowGeometry, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
-    get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, insert_hands,
-    insert_summary, Player,
+    get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, Player,
 };
-use holdem_suite_parser::parser::parse_hands;
-use holdem_suite_parser::summary_parser;
-
 x11rb::atom_manager! {
     pub Atoms: AtomsCookie {
         WM_PROTOCOLS,
@@ -260,42 +255,17 @@ async fn close_splashscreen(window: tauri::Window) {
     window.get_window("main").unwrap().show().unwrap();
 }
 
-fn parse_file(path: PathBuf) {
-    let connection = &mut establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
-    let path_cloned = path.clone();
-    let path_str = path_cloned.to_str().unwrap();
-    if path.clone().to_str().unwrap().contains("summary") {
-        let data = fs::read_to_string(path).expect("Unable to read file");
-        let parse_result = summary_parser::TournamentSummary::parse(&data);
-        match parse_result {
-            Ok((_, summary)) => insert_summary(connection, summary),
-            Err(_) => println!("Error parsing {}", path_str),
-        }
-    } else {
-        println!("Parsing {}", path_str);
-        let data = fs::read_to_string(path).expect("Unable to read file");
-        let start = Instant::now();
-        let parse_result = parse_hands(&data);
-        match parse_result {
-            Ok((_, hands)) => {
-                let nb_hands = insert_hands(connection, hands).unwrap();
-                println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
-            }
-            Err(_) => println!("Error parsing {}", path_str),
-        }
-    }
-}
-
 fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
     let _ = watcher.watch(path.as_ref(), RecursiveMode::Recursive);
+    let database_url = "sqlite:///home/clemux/dev/holdem-suite/test.db";
     for res in rx {
         match res {
             Ok(event) => match event.kind {
                 EventKind::Create(_) => {
                     println!("created file: {:?}", event.paths[0]);
-                    parse_file(event.paths[0].clone());
+                    parse_file(event.paths[0].clone(), database_url);
                     app_handle
                         .emit_all(
                             "watcher",
@@ -308,7 +278,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
                 EventKind::Modify(_) => {
                     let path = event.paths[0].clone();
                     println!("modified file: {:?}", path);
-                    parse_file(path.clone());
+                    parse_file(path.clone(), database_url);
                     app_handle
                         .emit_all(
                             "watcher",
