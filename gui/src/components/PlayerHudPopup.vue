@@ -37,7 +37,7 @@ onMounted(() => {
   <table v-if="stats">
     <tr v-if="player">
       <td>{{ player.name }}</td>
-      <td>{{ player.nb_hands }}</td>
+      <td>{{ stats.nb_hands }}</td>
     </tr>
     <tr>
       <td>

@@ -13,7 +13,6 @@ export type Table = {
 
 export type Player = {
     name: string,
-    nb_hands: number,
 }
 
 export type PlayerStats = {
