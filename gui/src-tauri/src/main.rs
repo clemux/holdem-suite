@@ -144,6 +144,7 @@ struct PlayerStats {
     pfr: f32,
     three_bet: f32,
     open_limp: f32,
+    nb_hands: u32,
 }
 
 #[tauri::command]
@@ -157,6 +158,7 @@ fn load_player_stats(
         pfr: 0.0,
         three_bet: 0.0,
         open_limp: 0.0,
+        nb_hands: 0,
     };
     let hands_actions = get_hands_for_player(&mut conn, player_name.as_str())
         .map_err(|e| "Error while loading hands for player")?;
@@ -180,6 +182,7 @@ fn load_player_stats(
         pfr: stats.pfr / nb_hands as f32,
         three_bet: stats.three_bet / nb_hands as f32,
         open_limp: stats.open_limp / nb_hands as f32,
+        nb_hands: nb_hands as u32,
     })
 }
 

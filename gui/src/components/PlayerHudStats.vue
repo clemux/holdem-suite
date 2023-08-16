@@ -5,6 +5,7 @@ import {invoke} from "@tauri-apps/api/tauri";
 import {onMounted, ref, watch} from "vue";
 
 import { WebviewWindow } from '@tauri-apps/api/window'
+import {listen} from "@tauri-apps/api/event";
 const stats = ref<PlayerStats | null>(null);
 const props = defineProps<{
   player: Player;
@@ -46,7 +47,16 @@ watch(() => props.player, async (_, __) => {
   await loadPlayerStats();
 })
 
+
+async function listenWatchEvent() {
+  return await listen('watcher', (event) => {
+    console.log(event);
+    loadPlayerStats();
+  })
+}
+
 onMounted(() => {
+  listenWatchEvent();
   loadPlayerStats();
 });
 
@@ -58,7 +68,7 @@ onMounted(() => {
   <table v-if="stats" @click="openPopup()">
     <tr>
       <td>{{ player.name }}</td>
-      <td>{{ player.nb_hands }}</td>
+      <td>{{ stats.nb_hands }}</td>
     </tr>
     <tr>
       <td>
