@@ -221,11 +221,8 @@ pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>> {
         ))
         .load(conn)?;
     Ok(action_vec
-        .iter()
-        .map(|(n, c)| Player {
-            name: n.to_owned(),
-            nb_hands: *c,
-        })
+        .into_iter()
+        .map(|(n, c)| Player { name: n })
         .collect())
 }
 
