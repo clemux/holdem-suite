@@ -210,7 +210,6 @@ pub fn get_actions_for_player(
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Player {
     pub name: String,
-    pub nb_hands: i64,
 }
 
 pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>> {
@@ -243,29 +242,11 @@ pub fn get_players_for_table(
         query = query.filter(hands::cash_game_name.eq(cash_game_name));
     }
     let hand: Hand = query.order(hands::datetime.desc()).first(conn)?;
-    let (hands1, hands2) = diesel::alias!(hands as h1, hands as h2);
-    let (actions1, actions2) = diesel::alias!(actions as a1, actions as a2);
-    let players_vec: Vec<(String, i64)> = hands1
-        .inner_join(actions1.on(hands1.field(hands::id).eq(actions1.field(actions::hand_id))))
-        .filter(
-            actions1.field(actions::dsl::player_name).eq_any(
-                hands2
-                    .inner_join(
-                        actions2.on(hands2.field(hands::id).eq(actions2.field(actions::hand_id))),
-                    )
-                    .filter(hands2.field(hands::id).eq(hand.id))
-                    .select(actions2.field(actions::player_name))
-                    .distinct(),
-            ),
-        )
-        .group_by(actions1.field(actions::dsl::player_name))
-        .select((
-            actions1.field(actions::dsl::player_name),
-            diesel::dsl::count_distinct(hands1.field(hands::id)),
-        ))
+    let seats = Seat::belonging_to(&hand)
+        .select(Seat::as_select())
         .load(conn)?;
-    Ok(players_vec
+    Ok(seats
         .into_iter()
-        .map(|(name, nb_hands)| Player { name, nb_hands })
+        .map(|Seat { player_name, .. }| Player { name: player_name })
         .collect())
 }
