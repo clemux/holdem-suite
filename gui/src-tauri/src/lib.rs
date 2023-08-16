@@ -1,6 +1,10 @@
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Instant;
 
+use diesel::SqliteConnection;
 use nom::branch::alt;
 use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded, tuple};
@@ -15,12 +19,9 @@ use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, Window};
 use x11rb::rust_connection::RustConnection;
 
 use holdem_suite_db::models::Action;
-use holdem_suite_db::{establish_connection, insert_hands, insert_summary};
+use holdem_suite_db::{insert_hands, insert_summary};
 use holdem_suite_parser::parser::parse_hands;
-use holdem_suite_parser::summary_parser;
-use std::fs;
-use std::path::PathBuf;
-use std::time::Instant;
+use holdem_suite_parser::summary_parser::TournamentSummary;
 
 use crate::errors::MyError;
 
@@ -234,16 +235,21 @@ pub fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetri
     metrics
 }
 
-pub fn parse_file(path: PathBuf, database_url: &str) {
-    let connection = &mut establish_connection(database_url);
+pub fn parse_file(path: PathBuf, connection: &mut SqliteConnection) -> u32 {
     let path_cloned = path.clone();
     let path_str = path_cloned.to_str().unwrap();
     if path.clone().to_str().unwrap().contains("summary") {
         let data = fs::read_to_string(path).expect("Unable to read file");
-        let parse_result = summary_parser::TournamentSummary::parse(&data);
+        let parse_result = TournamentSummary::parse(&data);
         match parse_result {
-            Ok((_, summary)) => insert_summary(connection, summary),
-            Err(_) => println!("Error parsing {}", path_str),
+            Ok((_, summary)) => {
+                insert_summary(connection, summary);
+                return 0;
+            }
+            Err(_) => {
+                println!("Error parsing {}", path_str);
+                return 0;
+            }
         }
     } else {
         println!("Parsing {}", path_str);
@@ -254,8 +260,12 @@ pub fn parse_file(path: PathBuf, database_url: &str) {
             Ok((_, hands)) => {
                 let nb_hands = insert_hands(connection, hands).unwrap();
                 println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
+                return nb_hands;
             }
-            Err(_) => println!("Error parsing {}", path_str),
+            Err(_) => {
+                println!("Error parsing {}", path_str);
+                return 0;
+            }
         }
     }
 }

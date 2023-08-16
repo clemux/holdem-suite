@@ -260,12 +260,13 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
     let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
     let _ = watcher.watch(path.as_ref(), RecursiveMode::Recursive);
     let database_url = "sqlite:///home/clemux/dev/holdem-suite/test.db";
+    let mut connection = establish_connection(database_url);
     for res in rx {
         match res {
             Ok(event) => match event.kind {
                 EventKind::Create(_) => {
                     println!("created file: {:?}", event.paths[0]);
-                    parse_file(event.paths[0].clone(), database_url);
+                    parse_file(event.paths[0].clone(), &mut connection);
                     app_handle
                         .emit_all(
                             "watcher",
@@ -278,7 +279,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
                 EventKind::Modify(_) => {
                     let path = event.paths[0].clone();
                     println!("modified file: {:?}", path);
-                    parse_file(path.clone(), database_url);
+                    parse_file(path.clone(), &mut connection);
                     app_handle
                         .emit_all(
                             "watcher",
