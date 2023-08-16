@@ -98,13 +98,14 @@ pub struct WindowManager {
 }
 
 impl WindowManager {
-    pub fn connect() -> Result<Self, &'static str> {
-        let (conn, screen_num) = x11rb::connect(None).unwrap();
+    pub fn connect() -> Result<Self, MyError> {
+        let (conn, screen_num) = x11rb::connect(None)?;
         let root = conn.setup().roots[screen_num].root;
-        let atoms = Atoms::new(&conn).unwrap().reply().unwrap();
+        let atoms = Atoms::new(&conn)?.reply()?;
         Ok(WindowManager { conn, atoms, root })
     }
-    fn windows(&self) -> Result<Vec<u32>, &'static str> {
+
+    fn windows(&self) -> Result<Vec<u32>, MyError> {
         let mut windows = vec![];
         let reply = self
             .conn
@@ -115,17 +116,15 @@ impl WindowManager {
                 AtomEnum::WINDOW,
                 0,
                 u32::MAX,
-            )
-            .unwrap()
-            .reply()
-            .unwrap();
-        for window in reply.value32().unwrap() {
+            )?
+            .reply()?;
+        for window in reply.value32().ok_or(MyError::Windows)? {
             windows.push(window);
         }
         Ok(windows)
     }
 
-    fn win_name(&self, win: Window) -> Result<String, &'static str> {
+    fn win_name(&self, win: Window) -> Result<String, MyError> {
         let reply = self
             .conn
             .get_property(
@@ -135,22 +134,20 @@ impl WindowManager {
                 self.atoms.UTF8_STRING,
                 0,
                 u32::MAX,
-            )
-            .unwrap()
-            .reply()
-            .unwrap();
+            )?
+            .reply()?;
         if reply.type_ != x11rb::NONE {
             if let Ok(value) = std::str::from_utf8(&reply.value) {
                 if !value.is_empty() {
                     Ok(value.to_owned())
                 } else {
-                    Err("win_name: _NET_WM_NAME is empty")
+                    Err(MyError::NetWmNameEmpty)
                 }
             } else {
-                Err("win_name: _NET_WM_NAME is not UTF8")
+                Err(MyError::NetWmNameNotUtf8)
             }
         } else {
-            Err("win_name: _NET_WM_NAME is NONE")
+            Err(MyError::NetWmNameNotUtf8)
         }
     }
 
@@ -167,17 +164,15 @@ impl WindowManager {
         })
     }
 
-    pub fn table_windows(&self) -> Result<Vec<TableWindow>, &'static str> {
+    pub fn table_windows(&self) -> Result<Vec<TableWindow>, MyError> {
         let mut table_windows = vec![];
         for win in self.windows()? {
             let name = self.win_name(win)?;
             if name.starts_with("Winamax ") {
                 table_windows.push(TableWindow {
                     window: win,
-                    table: Table::from_str(&name).unwrap(),
-                    position: self
-                        .win_position(win)
-                        .map_err(|_| "error getting position")?,
+                    table: Table::from_str(&name).map_err(|_| MyError::TableWindows)?,
+                    position: self.win_position(win)?,
                 });
             }
         }
