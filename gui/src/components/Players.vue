@@ -17,7 +17,6 @@ const playerColumns: QTableColumn[] = [
     field: 'name',
     sortable: true
   },
-  {name: 'hands', align: 'center', label: 'Hands', field: 'nb_hands', sortable: true},
 ]
 const playerRows = ref<Player[]>([]);
 const tables = ref([]);
