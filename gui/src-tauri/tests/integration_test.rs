@@ -44,17 +44,25 @@ fn test_parse_file() {
     let nb_parsed_hands = parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn);
     assert_eq!(3, nb_parsed_hands);
 
-    let hands = get_hands(&mut conn);
+    let hands = get_hands(&mut conn).unwrap();
     assert_eq!(3, hands.len());
-    assert_eq!("Ah", hands[0].hole_card_1);
+    assert_eq!("6s", hands[0].hole_card_1);
 }
 
 #[test]
 fn test_get_hands_for_player() {
     let mut conn = establish_test_connection();
     parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn);
-    let hands = get_hands(&mut conn);
+    let hands = get_hands(&mut conn).unwrap();
     assert_eq!(3, hands.len());
     let hands = holdem_suite_db::get_hands_for_player(&mut conn, "WinterSound").unwrap();
     assert_eq!(2, hands.len());
+}
+
+#[test]
+fn test_get_players() {
+    let mut conn = establish_test_connection();
+    parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn);
+    let players = holdem_suite_db::get_players(&mut conn).unwrap();
+    assert_eq!(7, players.len());
 }
