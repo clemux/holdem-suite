@@ -207,17 +207,11 @@ pub struct Player {
 }
 
 pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>, DatabaseError> {
-    let action_vec: Vec<(String, i64)> = actions::table
-        .group_by(actions::dsl::player_name)
-        .select((
-            actions::dsl::player_name,
-            diesel::dsl::count(actions::hand_id),
-        ))
+    let seats: Vec<String> = seats::table
+        .select(seats::dsl::player_name)
+        .distinct()
         .load(conn)?;
-    Ok(action_vec
-        .into_iter()
-        .map(|(n, c)| Player { name: n })
-        .collect())
+    Ok(seats.into_iter().map(|name| Player { name }).collect())
 }
 
 pub fn get_players_for_table(
