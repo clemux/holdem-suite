@@ -4,8 +4,8 @@ import {onMounted, ref} from "vue";
 import {QTableColumn} from "quasar";
 import type {Event} from '@tauri-apps/api/event'
 import {listen} from "@tauri-apps/api/event";
-import PlayerHud from "./PlayerHud.vue";
 import {Player} from "../lib/types";
+import PlayerHudStats from "./PlayerHudStats.vue";
 
 
 const playerColumns: QTableColumn[] = [
@@ -85,7 +85,7 @@ async function selectPlayer() {
       </form>
     </template>
     <template v-slot:after>
-      <PlayerHud v-for="player in selectedPlayer" :player="player"/>
+      <PlayerHudStats v-for="player in selectedPlayer" :player="player"/>
     </template>
   </q-splitter>
 

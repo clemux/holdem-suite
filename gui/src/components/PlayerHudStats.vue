@@ -17,7 +17,7 @@ async function loadPlayerStats() {
 
 async function openPopup() {
   console.log("Opening popup");
-  await invoke("open_popup", {player: props.player});
+  // await invoke("open_popup", {player: props.player});
 }
 
 watch(() => props.player, async (_, __) => {
@@ -52,12 +52,25 @@ onMounted(() => {
         {{ (stats.vpip * 100).toFixed(0) }}
       </td>
       <td>{{ (stats.pfr * 100).toFixed(0) }}</td>
-      <td>{{ (stats.three_bet * 100).toFixed(1) }}</td>
+      <td class="text-red">{{ (stats.three_bet * 100).toFixed(1) }}</td>
       <td>{{ (stats.open_limp * 100).toFixed(0) }}</td>
     </tr>
   </table>
 </template>
 
 <style scoped>
+table {
+  table-layout: fixed;
+  width: 160px;
+  height: 40px;
+}
+
+td {
+  table-layout: fixed;
+  width: 40px;
+  height: 20px;
+  overflow: hidden;
+  font-size: 12px;
+}
 
 </style>
