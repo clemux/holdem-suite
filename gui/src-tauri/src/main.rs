@@ -4,11 +4,11 @@
 use std::path::Path;
 use std::thread;
 
-use anyhow::Result;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 
+use gui::errors::ApplicationError;
 use gui::{compute_hand_metrics, parse_file, Table, WindowGeometry, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
@@ -37,7 +37,7 @@ struct Payload {
 }
 
 #[tauri::command]
-fn open_popup(player: Player, handle: AppHandle) -> Result<(), &'static str> {
+fn open_popup(player: Player, handle: AppHandle) -> Result<(), ApplicationError> {
     let window = WindowBuilder::new(
         &handle,
         "popup",
@@ -46,11 +46,10 @@ fn open_popup(player: Player, handle: AppHandle) -> Result<(), &'static str> {
     .decorations(false)
     .inner_size(200.0, 50.0)
     .resizable(false)
-    .build()
-    .map_err(|_| "Error creating popup")?;
+    .build()?;
     let label = window.label().to_owned();
     window.once("popupReady", move |msg| {
-        let window = handle.get_window(&label).unwrap();
+        let window = handle.get_window(&label).unwrap(); // TODO: how to handle errors here?
         window.emit("popup", player).unwrap();
         println!("Received {:?}", msg);
     });
@@ -102,35 +101,37 @@ fn open_hud(
 }
 
 #[tauri::command]
-fn load_summaries(state: tauri::State<Settings>) -> Vec<Summary> {
+fn load_summaries(state: tauri::State<Settings>) -> Result<Vec<Summary>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
-    get_summaries(&mut conn)
+    Ok(get_summaries(&mut conn)?)
 }
 
 #[tauri::command]
-fn load_hands(state: tauri::State<Settings>) -> Vec<Hand> {
+fn load_hands(state: tauri::State<Settings>) -> Result<Vec<Hand>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
-    get_hands(&mut conn)
+    Ok(get_hands(&mut conn)?)
 }
 
 #[tauri::command]
-fn load_seats(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Seat>, &'static str> {
+fn load_seats(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Seat>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
-    let seats = get_seats(&mut conn, hand_id).map_err(|_| "Error loading seats")?;
+    let seats = get_seats(&mut conn, hand_id)?;
     Ok(seats)
 }
 
 #[tauri::command]
-fn load_actions(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Action>, &'static str> {
+fn load_actions(
+    hand_id: &str,
+    state: tauri::State<Settings>,
+) -> Result<Vec<Action>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
-    let actions = get_actions_for_hand(&mut conn, hand_id).map_err(|_| "Error loading actions")?;
-    Ok(actions)
+    Ok(get_actions_for_hand(&mut conn, hand_id)?)
 }
 
 #[tauri::command]
-fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, &'static str> {
+fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
-    get_players(&mut conn).map_err(|e| "Error while loading players")
+    Ok(get_players(&mut conn)?)
 }
 
 #[derive(Serialize)]
@@ -146,7 +147,7 @@ struct PlayerStats {
 fn load_player_stats(
     player_name: String,
     state: tauri::State<Settings>,
-) -> Result<PlayerStats, &'static str> {
+) -> Result<PlayerStats, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
     let mut stats = PlayerStats {
         vpip: 0.0,
@@ -155,8 +156,7 @@ fn load_player_stats(
         open_limp: 0.0,
         nb_hands: 0,
     };
-    let hands_actions = get_hands_for_player(&mut conn, player_name.as_str())
-        .map_err(|e| "Error while loading hands for player")?;
+    let hands_actions = get_hands_for_player(&mut conn, player_name.as_str())?;
     let nb_hands = hands_actions.len();
     for (_, actions) in hands_actions {
         let metrics = compute_hand_metrics(actions);
@@ -185,38 +185,35 @@ fn load_player_stats(
 fn load_players_for_table(
     state: tauri::State<Settings>,
     table: Table,
-) -> Result<Vec<Player>, &'static str> {
+) -> Result<Vec<Player>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
     match table {
-        Table::CashGame(name) => get_players_for_table(&mut conn, None, Some(name.clone()))
-            .map_err(|e| {
-                eprintln!("Error while loading players for table {}: {}", name, e);
-                "Error while loading players for table"
-            }),
-        Table::Tournament { id, .. } => get_players_for_table(&mut conn, Some(id as i32), None)
-            .map_err(|e| {
-                eprintln!("Error while loading players for tournament {}: {}", id, e);
-                "Error while loading players for tournament"
-            }),
-        _ => Err("Invalid table type"),
+        Table::CashGame(name) => Ok(get_players_for_table(&mut conn, None, Some(name.clone()))?),
+        Table::Tournament { id, .. } => {
+            Ok(get_players_for_table(&mut conn, Some(id as i32), None)?)
+        }
+        _ => Err(ApplicationError::LoadPlayersForTable),
     }
 }
 
 #[tauri::command]
-fn get_latest_actions(table: Table, state: tauri::State<Settings>) -> Vec<Action> {
+fn get_latest_actions(
+    table: Table,
+    state: tauri::State<Settings>,
+) -> Result<Vec<Action>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
     match table {
-        Table::CashGame(name) => match get_latest_hand(&mut conn, None, Some(name)) {
-            Some(hand) => return get_actions(&mut conn, hand.id),
-            None => return vec![],
+        Table::CashGame(name) => match get_latest_hand(&mut conn, None, Some(name))? {
+            Some(hand) => Ok(get_actions(&mut conn, hand.id)?),
+            None => Ok(vec![]),
         },
-        Table::Tournament { id, .. } => match get_latest_hand(&mut conn, Some(id), None) {
-            Some(hand) => return get_actions(&mut conn, hand.id),
-            None => return vec![],
+        Table::Tournament { id, .. } => match get_latest_hand(&mut conn, Some(id), None).unwrap() {
+            Some(hand) => Ok(get_actions(&mut conn, hand.id)?),
+            None => Ok(vec![]),
         },
         Table::PendingTournament { id, .. } => {
             println!("Ignoring pending tournament{}", id);
-            vec![]
+            Ok(vec![])
         }
     }
 }
@@ -229,11 +226,10 @@ struct TsTable {
 }
 
 #[tauri::command]
-fn detect_tables() -> Vec<TsTable> {
-    let wm = WindowManager::connect().unwrap();
-    let table_windows = wm.table_windows().unwrap();
-    println!("{:?}", table_windows);
-    table_windows
+fn detect_tables() -> Result<Vec<TsTable>, ApplicationError> {
+    let wm = WindowManager::connect()?;
+    let table_windows = wm.table_windows()?;
+    Ok(table_windows
         .iter()
         .map(|t| TsTable {
             rs_table: t.table.clone(),
@@ -244,7 +240,7 @@ fn detect_tables() -> Vec<TsTable> {
             },
             window_position: t.position.clone(),
         })
-        .collect()
+        .collect())
 }
 
 #[tauri::command]
@@ -266,7 +262,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
             Ok(event) => match event.kind {
                 EventKind::Create(_) => {
                     println!("created file: {:?}", event.paths[0]);
-                    parse_file(event.paths[0].clone(), &mut connection);
+                    let _ = parse_file(event.paths[0].clone(), &mut connection).unwrap();
                     app_handle
                         .emit_all(
                             "watcher",
@@ -279,7 +275,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
                 EventKind::Modify(_) => {
                     let path = event.paths[0].clone();
                     println!("modified file: {:?}", path);
-                    parse_file(path.clone(), &mut connection);
+                    let _ = parse_file(path.clone(), &mut connection).unwrap();
                     app_handle
                         .emit_all(
                             "watcher",

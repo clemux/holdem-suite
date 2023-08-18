@@ -23,9 +23,9 @@ use holdem_suite_db::{insert_hands, insert_summary};
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser::TournamentSummary;
 
-use crate::errors::MyError;
+use crate::errors::ApplicationError;
 
-mod errors;
+pub mod errors;
 
 x11rb::atom_manager! {
     pub Atoms: AtomsCookie {
@@ -105,14 +105,14 @@ pub struct WindowManager {
 }
 
 impl WindowManager {
-    pub fn connect() -> Result<Self, MyError> {
+    pub fn connect() -> Result<Self, ApplicationError> {
         let (conn, screen_num) = x11rb::connect(None)?;
         let root = conn.setup().roots[screen_num].root;
         let atoms = Atoms::new(&conn)?.reply()?;
         Ok(WindowManager { conn, atoms, root })
     }
 
-    fn windows(&self) -> Result<Vec<u32>, MyError> {
+    fn windows(&self) -> Result<Vec<u32>, ApplicationError> {
         let mut windows = vec![];
         let reply = self
             .conn
@@ -125,13 +125,13 @@ impl WindowManager {
                 u32::MAX,
             )?
             .reply()?;
-        for window in reply.value32().ok_or(MyError::Windows)? {
+        for window in reply.value32().ok_or(ApplicationError::Windows)? {
             windows.push(window);
         }
         Ok(windows)
     }
 
-    fn win_name(&self, win: Window) -> Result<String, MyError> {
+    fn win_name(&self, win: Window) -> Result<String, ApplicationError> {
         let reply = self
             .conn
             .get_property(
@@ -148,17 +148,17 @@ impl WindowManager {
                 if !value.is_empty() {
                     Ok(value.to_owned())
                 } else {
-                    Err(MyError::NetWmNameEmpty)
+                    Err(ApplicationError::NetWmNameEmpty)
                 }
             } else {
-                Err(MyError::NetWmNameNotUtf8)
+                Err(ApplicationError::NetWmNameNotUtf8)
             }
         } else {
-            Err(MyError::NetWmNameNotUtf8)
+            Err(ApplicationError::NetWmNameNotUtf8)
         }
     }
 
-    fn win_position(&self, win: Window) -> Result<WindowGeometry, MyError> {
+    fn win_position(&self, win: Window) -> Result<WindowGeometry, ApplicationError> {
         let reply = self
             .conn
             .get_geometry(win)? // MyError::X11Connection
@@ -171,14 +171,14 @@ impl WindowManager {
         })
     }
 
-    pub fn table_windows(&self) -> Result<Vec<TableWindow>, MyError> {
+    pub fn table_windows(&self) -> Result<Vec<TableWindow>, ApplicationError> {
         let mut table_windows = vec![];
         for win in self.windows()? {
             let name = self.win_name(win)?;
             if name.starts_with("Winamax ") {
                 table_windows.push(TableWindow {
                     window: win,
-                    table: Table::from_str(&name).map_err(|_| MyError::TableWindows)?,
+                    table: Table::from_str(&name).map_err(|_| ApplicationError::TableWindows)?,
                     position: self.win_position(win)?,
                 });
             }
@@ -235,7 +235,10 @@ pub fn compute_hand_metrics(actions: Vec<Action>) -> HashMap<String, PlayerMetri
     metrics
 }
 
-pub fn parse_file(path: PathBuf, connection: &mut SqliteConnection) -> u32 {
+pub fn parse_file(
+    path: PathBuf,
+    connection: &mut SqliteConnection,
+) -> Result<u32, ApplicationError> {
     let path_cloned = path.clone();
     let path_str = path_cloned.to_str().unwrap();
     if path.clone().to_str().unwrap().contains("summary") {
@@ -243,12 +246,12 @@ pub fn parse_file(path: PathBuf, connection: &mut SqliteConnection) -> u32 {
         let parse_result = TournamentSummary::parse(&data);
         match parse_result {
             Ok((_, summary)) => {
-                insert_summary(connection, summary);
-                return 0;
+                let _ = insert_summary(connection, summary)?;
+                Ok(0)
             }
             Err(_) => {
                 println!("Error parsing {}", path_str);
-                return 0;
+                Ok(0)
             }
         }
     } else {
@@ -258,13 +261,13 @@ pub fn parse_file(path: PathBuf, connection: &mut SqliteConnection) -> u32 {
         let parse_result = parse_hands(&data);
         match parse_result {
             Ok((_, hands)) => {
-                let nb_hands = insert_hands(connection, hands).unwrap();
+                let nb_hands = insert_hands(connection, hands)?;
                 println!("Parsed {} hands in {:?}", nb_hands, start.elapsed());
-                return nb_hands;
+                Ok(nb_hands)
             }
             Err(_) => {
                 println!("Error parsing {}", path_str);
-                return 0;
+                Ok(0)
             }
         }
     }
