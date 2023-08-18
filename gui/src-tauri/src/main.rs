@@ -80,7 +80,7 @@ fn open_hud(
         tauri::WindowUrl::App("hud.html".into()),
     )
     .decorations(false)
-    .inner_size(200.0, 50.0)
+    .inner_size(160.0, 50.0)
     .position(hud_x, hud_y)
     .resizable(true)
     .always_on_top(true)
