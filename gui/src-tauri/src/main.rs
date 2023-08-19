@@ -262,8 +262,8 @@ async fn close_splashscreen(window: tauri::Window) {
     window.get_window("main").unwrap().show().unwrap();
 }
 
-fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, custom_tx: mpsc::Sender<()>) {
-    let (tx, rx) = std::sync::mpsc::channel();
+fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, event_tx: mpsc::Sender<()>) {
+    let (tx, rx) = mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
     let _ = watcher.watch(path.as_ref(), RecursiveMode::Recursive);
     let database_url = "sqlite:///home/clemux/dev/holdem-suite/test.db";
@@ -282,7 +282,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, custom_tx: mpsc::Sender
                             },
                         )
                         .unwrap();
-                    custom_tx.send(()).unwrap();
+                    event_tx.send(()).unwrap();
                 }
                 EventKind::Modify(_) => {
                     let path = event.paths[0].clone();
@@ -296,7 +296,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, custom_tx: mpsc::Sender
                             },
                         )
                         .unwrap();
-                    custom_tx.send(()).unwrap();
+                    event_tx.send(()).unwrap();
                 }
                 _ => {}
             },
@@ -348,8 +348,10 @@ fn create_player_hud(
     let label = window_label.to_owned();
     let player_copy = player.to_owned();
     window.once("hudReady", move |msg| {
-        let window = app_handle.get_window(&label).unwrap();
-        window.emit("hud", player_copy).unwrap();
+        let window = app_handle.get_window(&label).expect("Error getting window");
+        window
+            .emit("hud", player_copy)
+            .expect("Error emitting hud event");
         println!("Received {:?}", msg);
     });
     Ok(HudWindow {
@@ -366,26 +368,29 @@ struct TableHuds {
 }
 
 impl TableHuds {
-    fn new(table: TableWindow, app_handle: AppHandle) -> TableHuds {
+    fn new(
+        table_window: TableWindow,
+        app_handle: AppHandle,
+    ) -> Result<TableHuds, ApplicationError> {
         let players: HashSet<Player> =
-            HashSet::from_iter(get_table_players(table.table.to_owned()).unwrap());
+            HashSet::from_iter(get_table_players(table_window.table.to_owned())?);
 
-        println!("New HUDs for {:?}", table);
+        println!("New HUDs for {:?}", table_window);
         println!("Players: {:?}", players);
         let huds: Vec<HudWindow> = players
             .iter()
             .map(|p| {
-                create_player_hud(table.to_owned(), p.to_owned(), app_handle.to_owned()).unwrap()
+                create_player_hud(table_window.to_owned(), p.to_owned(), app_handle.to_owned())
             })
-            .collect();
-        TableHuds {
-            table_window: table,
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(TableHuds {
+            table_window,
             players,
-            huds: huds,
-        }
+            huds,
+        })
     }
 
-    fn update(&mut self, app_handle: AppHandle) {
+    fn update(&mut self, app_handle: AppHandle) -> Result<(), ApplicationError> {
         let players =
             HashSet::from_iter(get_table_players(self.table_window.table.to_owned()).unwrap());
         println!("Update - Players: {:?}", players);
@@ -419,6 +424,7 @@ impl TableHuds {
             }
         });
         self.players = players;
+        Ok(())
     }
 
     fn close(self) {}
@@ -428,19 +434,37 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
     let mut tables_windows: HashMap<Window, TableWindow> = HashMap::new();
     let mut tables_huds: HashMap<Window, TableHuds> = HashMap::new();
     loop {
-        for event in event_rx.try_recv() {
-            println!("Received event {:?}", event);
-            for hud in tables_huds.values_mut() {
-                hud.update(app_handle.to_owned());
+        let mut received_event = false;
+        for event in event_rx.try_iter() {
+            if !received_event {
+                received_event = true;
+                for hud in tables_huds.values_mut() {
+                    match hud.update(app_handle.to_owned()) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            println!("Error updating huds");
+                        }
+                    };
+                }
             }
         }
-        let wm = WindowManager::connect().unwrap();
-        let new_table_windows: Vec<TableWindow> = wm
-            .table_windows()
-            .unwrap()
-            .into_iter()
-            .filter(|t| matches!(t.table, Table::CashGame(_) | Table::Tournament { .. }))
-            .collect();
+        let wm = match WindowManager::connect() {
+            Ok(wm) => wm,
+            Err(_) => {
+                println!("Error connecting to window manager");
+                continue;
+            }
+        };
+        let new_table_windows: Vec<TableWindow> = match wm.table_windows() {
+            Ok(tables) => tables,
+            Err(_) => {
+                println!("Error getting table windows");
+                continue;
+            }
+        }
+        .into_iter()
+        .filter(|t| matches!(t.table, Table::CashGame(_) | Table::Tournament { .. }))
+        .collect();
 
         // closed windows
         let new_table_window_ids: Vec<Window> =
@@ -458,12 +482,15 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
         for new_table_window in new_table_windows.iter() {
             if !tables_windows.contains_key(&new_table_window.window) {
                 println!("New table window {:?}", new_table_window);
-                tables_huds
-                    .entry(new_table_window.window)
-                    .or_insert(TableHuds::new(
-                        new_table_window.clone(),
-                        app_handle.to_owned(),
-                    ));
+                match TableHuds::new(new_table_window.clone(), app_handle.to_owned()) {
+                    Ok(table_huds) => {
+                        tables_huds.insert(new_table_window.window, table_huds);
+                    }
+                    Err(_) => {
+                        println!("Error creating table huds");
+                        continue;
+                    }
+                }
             }
         }
 
