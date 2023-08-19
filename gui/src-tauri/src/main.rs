@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc;
 use std::thread;
 
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -19,6 +19,7 @@ use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
     get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, Player,
 };
+
 x11rb::atom_manager! {
     pub Atoms: AtomsCookie {
         WM_PROTOCOLS,
@@ -33,18 +34,6 @@ x11rb::atom_manager! {
 struct Settings<'a> {
     database_url: &'a str,
     watch_folder: &'a Path,
-}
-
-#[derive(Debug)]
-struct HudWindow {
-    label: String,
-    table: Table,
-    player: Player,
-}
-
-struct State {
-    hud_windows: Mutex<Vec<HudWindow>>,
-    tables: Mutex<Vec<TableWindow>>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -76,7 +65,6 @@ fn open_popup(player: Player, handle: AppHandle) -> Result<(), ApplicationError>
 #[tauri::command]
 fn open_hud_command(
     player: Player,
-    table: Table,
     position: WindowGeometry,
     handle: AppHandle,
 ) -> Result<(), &'static str> {
@@ -321,41 +309,50 @@ fn get_table_players(table: Table) -> Result<Vec<Player>, ApplicationError> {
     }
 }
 
-fn create_player_hud(
-    table: TableWindow,
+#[derive(Debug)]
+struct HudWindow {
+    label: String,
+    table: Table,
     player: Player,
-    app_handle: AppHandle,
-) -> Result<HudWindow, ApplicationError> {
-    let window_label = Uuid::new_v4().to_string();
+}
 
-    let hud_x = table.position.x as f64 + table.position.width as f64 / 2.0;
-    let hud_y = table.position.y as f64 + table.position.height as f64 / 2.0;
+impl HudWindow {
+    fn new(
+        table: TableWindow,
+        player: Player,
+        app_handle: AppHandle,
+    ) -> Result<HudWindow, ApplicationError> {
+        let window_label = Uuid::new_v4().to_string();
 
-    let window = WindowBuilder::new(
-        &app_handle,
-        window_label.to_owned(),
-        tauri::WindowUrl::App("hud.html".into()),
-    )
-    .decorations(false)
-    .inner_size(120.0, 50.0)
-    .position(hud_x, hud_y)
-    .resizable(true)
-    .always_on_top(true)
-    .build()?;
+        let hud_x = table.position.x as f64 + table.position.width as f64 / 2.0;
+        let hud_y = table.position.y as f64 + table.position.height as f64 / 2.0;
 
-    let label = window_label.to_owned();
-    let player_copy = player.to_owned();
-    window.once("hudReady", move |msg| {
-        let window = app_handle.get_window(&label).expect("Error getting window");
-        window
-            .emit("hud", player_copy)
-            .expect("Error emitting hud event");
-    });
-    Ok(HudWindow {
-        label: window_label,
-        table: table.table,
-        player: player,
-    })
+        let window = WindowBuilder::new(
+            &app_handle,
+            window_label.to_owned(),
+            tauri::WindowUrl::App("hud.html".into()),
+        )
+        .decorations(false)
+        .inner_size(120.0, 50.0)
+        .position(hud_x, hud_y)
+        .resizable(true)
+        .always_on_top(true)
+        .build()?;
+
+        let label = window_label.to_owned();
+        let player_copy = player.to_owned();
+        window.once("hudReady", move |_msg| {
+            let window = app_handle.get_window(&label).expect("Error getting window");
+            window
+                .emit("hud", player_copy)
+                .expect("Error emitting hud event");
+        });
+        Ok(HudWindow {
+            label: window_label,
+            table: table.table,
+            player,
+        })
+    }
 }
 
 struct TableHuds {
@@ -374,9 +371,7 @@ impl TableHuds {
 
         let huds: Vec<HudWindow> = players
             .iter()
-            .map(|p| {
-                create_player_hud(table_window.to_owned(), p.to_owned(), app_handle.to_owned())
-            })
+            .map(|p| HudWindow::new(table_window.to_owned(), p.to_owned(), app_handle.to_owned()))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(TableHuds {
             table_window,
@@ -392,7 +387,7 @@ impl TableHuds {
         let players_left = self.players.difference(&players);
         new_players.into_iter().for_each(|p| {
             self.huds.push(
-                create_player_hud(
+                HudWindow::new(
                     self.table_window.to_owned(),
                     p.to_owned(),
                     app_handle.to_owned(),
@@ -436,7 +431,7 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
     let mut tables_huds: HashMap<Window, TableHuds> = HashMap::new();
     loop {
         let mut received_event = false;
-        for event in event_rx.try_iter() {
+        for _event in event_rx.try_iter() {
             if !received_event {
                 received_event = true;
                 for hud in tables_huds.values_mut() {
