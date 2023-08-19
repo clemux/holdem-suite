@@ -1,15 +1,19 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::sync::{mpsc, Mutex};
 use std::thread;
 
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
+use uuid::Uuid;
+use x11rb::protocol::xproto::Window;
 
 use gui::errors::ApplicationError;
-use gui::{compute_hand_metrics, parse_file, Table, WindowGeometry, WindowManager};
+use gui::{compute_hand_metrics, parse_file, Table, TableWindow, WindowGeometry, WindowManager};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
@@ -29,6 +33,18 @@ x11rb::atom_manager! {
 struct Settings<'a> {
     database_url: &'a str,
     watch_folder: &'a Path,
+}
+
+#[derive(Debug)]
+struct HudWindow {
+    label: String,
+    table: Table,
+    player: Player,
+}
+
+struct State {
+    hud_windows: Mutex<Vec<HudWindow>>,
+    tables: Mutex<Vec<TableWindow>>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -58,19 +74,14 @@ fn open_popup(player: Player, handle: AppHandle) -> Result<(), ApplicationError>
 }
 
 #[tauri::command]
-fn open_hud(
+fn open_hud_command(
     player: Player,
     table: Table,
     position: WindowGeometry,
     handle: AppHandle,
 ) -> Result<(), &'static str> {
     println!("Opening HUD for {:?}", player);
-    let table_name = match table {
-        Table::CashGame(name) => name,
-        Table::Tournament { name, .. } => name,
-        Table::PendingTournament { name, .. } => name,
-    };
-    let window_label = format!("hud_{}_{}", table_name, player.name).replace(' ', "_");
+    let window_label = Uuid::new_v4().to_string();
     let hud_x = position.x as f64 + position.width as f64 / 2.0;
     let hud_y = position.y as f64 + position.height as f64 / 2.0;
     println!("Window label: {}", window_label);
@@ -251,7 +262,7 @@ async fn close_splashscreen(window: tauri::Window) {
     window.get_window("main").unwrap().show().unwrap();
 }
 
-fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
+fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, custom_tx: mpsc::Sender<()>) {
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
     let _ = watcher.watch(path.as_ref(), RecursiveMode::Recursive);
@@ -271,6 +282,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
                             },
                         )
                         .unwrap();
+                    custom_tx.send(()).unwrap();
                 }
                 EventKind::Modify(_) => {
                     let path = event.paths[0].clone();
@@ -284,11 +296,184 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: &AppHandle) {
                             },
                         )
                         .unwrap();
+                    custom_tx.send(()).unwrap();
                 }
                 _ => {}
             },
             Err(error) => println!("watch error: {:?}", error),
         }
+    }
+}
+
+fn get_table_players(table: Table) -> Result<Vec<Player>, ApplicationError> {
+    let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
+    let players = match table {
+        Table::CashGame(name) => get_players_for_table(&mut conn, None, Some(name.clone())),
+        Table::Tournament { id, .. } => get_players_for_table(&mut conn, Some(id as i32), None),
+        _ => Ok(vec![]),
+    };
+    match players {
+        Ok(players) => Ok(players),
+        Err(_) => {
+            println!("Error getting players");
+            Ok(vec![])
+        }
+    }
+}
+
+fn create_player_hud(
+    table: TableWindow,
+    player: Player,
+    app_handle: AppHandle,
+) -> Result<HudWindow, ApplicationError> {
+    println!("Creating player hud for {:?}", player);
+    let window_label = Uuid::new_v4().to_string();
+
+    let hud_x = table.position.x as f64 + table.position.width as f64 / 2.0;
+    let hud_y = table.position.y as f64 + table.position.height as f64 / 2.0;
+
+    let window = WindowBuilder::new(
+        &app_handle,
+        window_label.to_owned(),
+        tauri::WindowUrl::App("hud.html".into()),
+    )
+    .decorations(false)
+    .inner_size(160.0, 50.0)
+    .position(hud_x, hud_y)
+    .resizable(true)
+    .always_on_top(true)
+    .build()?;
+
+    println!("Opened window {:?}", window.label());
+    let label = window_label.to_owned();
+    let player_copy = player.to_owned();
+    window.once("hudReady", move |msg| {
+        let window = app_handle.get_window(&label).unwrap();
+        window.emit("hud", player_copy).unwrap();
+        println!("Received {:?}", msg);
+    });
+    Ok(HudWindow {
+        label: window_label,
+        table: table.table,
+        player: player,
+    })
+}
+
+struct TableHuds {
+    table_window: TableWindow,
+    huds: Vec<HudWindow>,
+    players: HashSet<Player>,
+}
+
+impl TableHuds {
+    fn new(table: TableWindow, app_handle: AppHandle) -> TableHuds {
+        let players: HashSet<Player> =
+            HashSet::from_iter(get_table_players(table.table.to_owned()).unwrap());
+
+        println!("New HUDs for {:?}", table);
+        println!("Players: {:?}", players);
+        let huds: Vec<HudWindow> = players
+            .iter()
+            .map(|p| {
+                create_player_hud(table.to_owned(), p.to_owned(), app_handle.to_owned()).unwrap()
+            })
+            .collect();
+        TableHuds {
+            table_window: table,
+            players,
+            huds: huds,
+        }
+    }
+
+    fn update(&mut self, app_handle: AppHandle) {
+        let players =
+            HashSet::from_iter(get_table_players(self.table_window.table.to_owned()).unwrap());
+        println!("Update - Players: {:?}", players);
+        let new_players = players.difference(&self.players);
+        let players_left = self.players.difference(&players);
+        println!("New players: {:?}", new_players);
+        println!("Players left: {:?}", players_left);
+        new_players.into_iter().for_each(|p| {
+            self.huds.push(
+                create_player_hud(
+                    self.table_window.to_owned(),
+                    p.to_owned(),
+                    app_handle.to_owned(),
+                )
+                .unwrap(),
+            )
+        });
+        players_left.into_iter().for_each(|p| {
+            for hud in self.huds.iter() {
+                if hud.player == *p {
+                    println!("Closing HUD for {:?}", p);
+                    println!("Window label: {}", hud.label);
+                    let window = app_handle.get_window(hud.label.as_str());
+                    match window {
+                        Some(window) => window.close().unwrap(),
+                        None => {
+                            println!("Window {} not found", hud.label);
+                        }
+                    }
+                }
+            }
+        });
+        self.players = players;
+    }
+
+    fn close(self) {}
+}
+
+fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
+    let mut tables_windows: HashMap<Window, TableWindow> = HashMap::new();
+    let mut tables_huds: HashMap<Window, TableHuds> = HashMap::new();
+    loop {
+        for event in event_rx.try_recv() {
+            println!("Received event {:?}", event);
+            for hud in tables_huds.values_mut() {
+                hud.update(app_handle.to_owned());
+            }
+        }
+        let wm = WindowManager::connect().unwrap();
+        let new_table_windows: Vec<TableWindow> = wm
+            .table_windows()
+            .unwrap()
+            .into_iter()
+            .filter(|t| matches!(t.table, Table::CashGame(_) | Table::Tournament { .. }))
+            .collect();
+
+        // closed windows
+        let new_table_window_ids: Vec<Window> =
+            new_table_windows.iter().map(|t| t.window).collect();
+        for table_window in tables_windows.keys() {
+            if !new_table_window_ids.contains(table_window) {
+                //     close_table_hud_windows(
+                //         tables_windows.get(table_window).unwrap().clone(),
+                //         app_handle.to_owned(),
+                //     );
+            }
+        }
+
+        // new windows
+        for new_table_window in new_table_windows.iter() {
+            if !tables_windows.contains_key(&new_table_window.window) {
+                println!("New table window {:?}", new_table_window);
+                tables_huds
+                    .entry(new_table_window.window)
+                    .or_insert(TableHuds::new(
+                        new_table_window.clone(),
+                        app_handle.to_owned(),
+                    ));
+            }
+        }
+
+        // update
+        tables_windows.clear();
+        tables_windows = new_table_windows
+            .into_iter()
+            .map(|t| (t.window, t))
+            .collect();
+        thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 
@@ -313,7 +498,10 @@ fn setup_app(app: &App, settings: Settings) -> Result<(), Box<dyn std::error::Er
     });
     let app_handle = app.handle();
     let watch_folder = settings.watch_folder.to_owned();
-    thread::spawn(move || watch(watch_folder, &app_handle));
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || watch(watch_folder, app_handle, tx));
+    let app_handle = app.handle();
+    thread::spawn(move || watch_windows(app_handle, rx));
     Ok(())
 }
 
@@ -339,7 +527,7 @@ fn main() {
             load_seats,
             load_actions,
             open_popup,
-            open_hud,
+            open_hud_command,
         ])
         .manage(settings)
         .run(tauri::generate_context!())
