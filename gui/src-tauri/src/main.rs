@@ -326,7 +326,6 @@ fn create_player_hud(
     player: Player,
     app_handle: AppHandle,
 ) -> Result<HudWindow, ApplicationError> {
-    println!("Creating player hud for {:?}", player);
     let window_label = Uuid::new_v4().to_string();
 
     let hud_x = table.position.x as f64 + table.position.width as f64 / 2.0;
@@ -344,7 +343,6 @@ fn create_player_hud(
     .always_on_top(true)
     .build()?;
 
-    println!("Opened window {:?}", window.label());
     let label = window_label.to_owned();
     let player_copy = player.to_owned();
     window.once("hudReady", move |msg| {
@@ -352,7 +350,6 @@ fn create_player_hud(
         window
             .emit("hud", player_copy)
             .expect("Error emitting hud event");
-        println!("Received {:?}", msg);
     });
     Ok(HudWindow {
         label: window_label,
@@ -375,8 +372,6 @@ impl TableHuds {
         let players: HashSet<Player> =
             HashSet::from_iter(get_table_players(table_window.table.to_owned())?);
 
-        println!("New HUDs for {:?}", table_window);
-        println!("Players: {:?}", players);
         let huds: Vec<HudWindow> = players
             .iter()
             .map(|p| {
@@ -393,11 +388,8 @@ impl TableHuds {
     fn update(&mut self, app_handle: &AppHandle) -> Result<(), ApplicationError> {
         let players =
             HashSet::from_iter(get_table_players(self.table_window.table.to_owned()).unwrap());
-        println!("Update - Players: {:?}", players);
         let new_players = players.difference(&self.players);
         let players_left = self.players.difference(&players);
-        println!("New players: {:?}", new_players);
-        println!("Players left: {:?}", players_left);
         new_players.into_iter().for_each(|p| {
             self.huds.push(
                 create_player_hud(
@@ -411,8 +403,6 @@ impl TableHuds {
         players_left.into_iter().for_each(|p| {
             for hud in self.huds.iter() {
                 if hud.player == *p {
-                    println!("Closing HUD for {:?}", p);
-                    println!("Window label: {}", hud.label);
                     let window = app_handle.get_window(hud.label.as_str());
                     match window {
                         Some(window) => window.close().unwrap(),
@@ -429,8 +419,6 @@ impl TableHuds {
 
     fn close(&self, app_handle: &AppHandle) -> Result<(), ApplicationError> {
         for hud in self.huds.iter() {
-            println!("Closing HUD for {:?}", hud.player);
-            println!("Window label: {}", hud.label);
             let window = app_handle.get_window(hud.label.as_str());
             match window {
                 Some(window) => window.close()?,
@@ -499,7 +487,6 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
         // new windows
         for new_table_window in new_table_windows.iter() {
             if !tables_windows.contains_key(&new_table_window.window) {
-                println!("New table window {:?}", new_table_window);
                 match TableHuds::new(new_table_window.clone(), &app_handle) {
                     Ok(table_huds) => {
                         tables_huds.insert(new_table_window.window, table_huds);
