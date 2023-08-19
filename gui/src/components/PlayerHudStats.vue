@@ -61,13 +61,13 @@ onMounted(() => {
 <style scoped>
 table {
   table-layout: fixed;
-  width: 160px;
+  width: 120px;
   height: 40px;
 }
 
 td {
   table-layout: fixed;
-  width: 40px;
+  width: 30px;
   height: 20px;
   overflow: hidden;
   font-size: 12px;
