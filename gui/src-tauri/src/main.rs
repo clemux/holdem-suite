@@ -370,7 +370,7 @@ struct TableHuds {
 impl TableHuds {
     fn new(
         table_window: TableWindow,
-        app_handle: AppHandle,
+        app_handle: &AppHandle,
     ) -> Result<TableHuds, ApplicationError> {
         let players: HashSet<Player> =
             HashSet::from_iter(get_table_players(table_window.table.to_owned())?);
@@ -390,7 +390,7 @@ impl TableHuds {
         })
     }
 
-    fn update(&mut self, app_handle: AppHandle) -> Result<(), ApplicationError> {
+    fn update(&mut self, app_handle: &AppHandle) -> Result<(), ApplicationError> {
         let players =
             HashSet::from_iter(get_table_players(self.table_window.table.to_owned()).unwrap());
         println!("Update - Players: {:?}", players);
@@ -427,7 +427,7 @@ impl TableHuds {
         Ok(())
     }
 
-    fn close(&self, app_handle: AppHandle) -> Result<(), ApplicationError> {
+    fn close(&self, app_handle: &AppHandle) -> Result<(), ApplicationError> {
         for hud in self.huds.iter() {
             println!("Closing HUD for {:?}", hud.player);
             println!("Window label: {}", hud.label);
@@ -452,7 +452,7 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
             if !received_event {
                 received_event = true;
                 for hud in tables_huds.values_mut() {
-                    match hud.update(app_handle.to_owned()) {
+                    match hud.update(&app_handle) {
                         Ok(_) => {}
                         Err(_) => {
                             println!("Error updating huds");
@@ -486,7 +486,7 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
             if !new_table_window_ids.contains(table_window) {
                 let huds = tables_huds.remove(table_window);
                 if let Some(huds) = huds {
-                    match huds.close(app_handle.to_owned()) {
+                    match huds.close(&app_handle) {
                         Ok(_) => {}
                         Err(_) => {
                             println!("Error closing huds");
@@ -500,7 +500,7 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
         for new_table_window in new_table_windows.iter() {
             if !tables_windows.contains_key(&new_table_window.window) {
                 println!("New table window {:?}", new_table_window);
-                match TableHuds::new(new_table_window.clone(), app_handle.to_owned()) {
+                match TableHuds::new(new_table_window.clone(), &app_handle) {
                     Ok(table_huds) => {
                         tables_huds.insert(new_table_window.window, table_huds);
                     }
