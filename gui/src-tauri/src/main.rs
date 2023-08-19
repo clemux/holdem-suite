@@ -427,7 +427,20 @@ impl TableHuds {
         Ok(())
     }
 
-    fn close(self) {}
+    fn close(&self, app_handle: AppHandle) -> Result<(), ApplicationError> {
+        for hud in self.huds.iter() {
+            println!("Closing HUD for {:?}", hud.player);
+            println!("Window label: {}", hud.label);
+            let window = app_handle.get_window(hud.label.as_str());
+            match window {
+                Some(window) => window.close()?,
+                None => {
+                    println!("Window {} not found", hud.label);
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
@@ -471,10 +484,15 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
             new_table_windows.iter().map(|t| t.window).collect();
         for table_window in tables_windows.keys() {
             if !new_table_window_ids.contains(table_window) {
-                //     close_table_hud_windows(
-                //         tables_windows.get(table_window).unwrap().clone(),
-                //         app_handle.to_owned(),
-                //     );
+                let huds = tables_huds.remove(table_window);
+                if let Some(huds) = huds {
+                    match huds.close(app_handle.to_owned()) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            println!("Error closing huds");
+                        }
+                    }
+                }
             }
         }
 
