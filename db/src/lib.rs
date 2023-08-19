@@ -21,9 +21,6 @@ pub fn establish_connection(database_url: &str) -> SqliteConnection {
     let mut connection = SqliteConnection::establish(database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
     connection
-        .batch_execute("PRAGMA journal_mode=WAL;")
-        .unwrap();
-    connection
 }
 
 pub fn insert_summary(
@@ -201,7 +198,7 @@ pub fn get_actions_for_player(
         .load(conn)?)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, PartialEq, Eq, Hash)]
 pub struct Player {
     pub name: String,
 }
