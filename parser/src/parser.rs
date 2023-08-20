@@ -202,7 +202,7 @@ impl TableName {
 }
 
 #[derive(Debug, PartialEq)]
-enum MoneyType {
+pub enum MoneyType {
     RealMoney,
     PlayMoney,
 }
@@ -224,9 +224,9 @@ impl MoneyType {
 #[derive(Debug, PartialEq)]
 pub struct TableInfo {
     pub table_name: TableName,
-    max_players: u32,
-    currency: MoneyType,
-    button: u32,
+    pub max_players: u32,
+    pub currency: MoneyType,
+    pub button: u32,
 }
 
 impl TableInfo {
@@ -1034,6 +1034,19 @@ mod tests {
             max_players: 6,
             currency: MoneyType::RealMoney,
             button: 3,
+        };
+        let (_, actual) = TableInfo::parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_parse_table_info_cash_game_play_money() {
+        let input = "Table: 'Wichita 05' 5-max (play money) Seat #1 is the button\n";
+        let expected = TableInfo {
+            table_name: TableName::CashGame(String::from("Wichita 05")),
+            max_players: 5,
+            currency: MoneyType::PlayMoney,
+            button: 1,
         };
         let (_, actual) = TableInfo::parse(input).unwrap();
         assert_eq!(expected, actual);
