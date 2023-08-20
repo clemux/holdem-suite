@@ -18,6 +18,7 @@ use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
     get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, Player,
+    TablePlayer,
 };
 
 x11rb::atom_manager! {
@@ -53,10 +54,9 @@ fn open_popup(player: Player, handle: AppHandle) -> Result<(), ApplicationError>
     .resizable(false)
     .build()?;
     let label = window.label().to_owned();
-    window.once("popupReady", move |msg| {
+    window.once("popupReady", move |_msg| {
         let window = handle.get_window(&label).unwrap(); // TODO: how to handle errors here?
         window.emit("popup", player).unwrap();
-        println!("Received {:?}", msg);
     });
 
     Ok(())
@@ -68,11 +68,9 @@ fn open_hud_command(
     position: WindowGeometry,
     handle: AppHandle,
 ) -> Result<(), &'static str> {
-    println!("Opening HUD for {:?}", player);
     let window_label = Uuid::new_v4().to_string();
     let hud_x = position.x as f64 + position.width as f64 / 2.0;
     let hud_y = position.y as f64 + position.height as f64 / 2.0;
-    println!("Window label: {}", window_label);
     let window = WindowBuilder::new(
         &handle,
         window_label.to_owned(),
@@ -184,7 +182,7 @@ fn load_player_stats(
 fn load_players_for_table(
     state: tauri::State<Settings>,
     table: Table,
-) -> Result<Vec<Player>, ApplicationError> {
+) -> Result<Vec<TablePlayer>, ApplicationError> {
     let mut conn = establish_connection(state.database_url);
     match table {
         Table::CashGame(name) => Ok(get_players_for_table(&mut conn, None, Some(name.clone()))?),
@@ -210,10 +208,7 @@ fn get_latest_actions(
             Some(hand) => Ok(get_actions(&mut conn, hand.id)?),
             None => Ok(vec![]),
         },
-        Table::PendingTournament { id, .. } => {
-            println!("Ignoring pending tournament{}", id);
-            Ok(vec![])
-        }
+        Table::PendingTournament { .. } => Ok(vec![]),
     }
 }
 
@@ -293,7 +288,7 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, event_tx: mpsc::Sender<
     }
 }
 
-fn get_table_players(table: Table) -> Result<Vec<Player>, ApplicationError> {
+fn get_table_players(table: Table) -> Result<Vec<TablePlayer>, ApplicationError> {
     let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
     let players = match table {
         Table::CashGame(name) => get_players_for_table(&mut conn, None, Some(name.clone())),
@@ -309,23 +304,87 @@ fn get_table_players(table: Table) -> Result<Vec<Player>, ApplicationError> {
     }
 }
 
+fn compute_hud_position(
+    table: TableWindow,
+    max_players: i32,
+    hero_seat: i32,
+    player: TablePlayer,
+) -> (f64, f64) {
+    let seat_index = (player.seat_number + (max_players - hero_seat)) % max_players;
+    let (x_multiplier, y_multiplier) = match max_players {
+        3 => match seat_index {
+            0 => (0.57, 0.7),
+            1 => (0.1, 0.1),
+            2 => (0.8, 0.1),
+            _ => (0.5, 0.5),
+        },
+        5 => match seat_index {
+            0 => (0.57, 0.7),
+            1 => (0.07, 0.45),
+            2 => (0.35, 0.1),
+            3 => (0.8, 0.1),
+            4 => (0.8, 0.45),
+            _ => (0.5, 0.5),
+        },
+        6 => match seat_index {
+            0 => (0.57, 0.7),
+            1 => (0.07, 0.52),
+            2 => (0.07, 0.1),
+            3 => (0.57, 0.1),
+            4 => (0.8, 0.33),
+            5 => (0.8, 0.52),
+            _ => (0.5, 0.5),
+        },
+        7 => match seat_index {
+            0 => (0.57, 0.7),
+            1 => (0.02, 0.7),
+            2 => (0.07, 0.3),
+            3 => (0.3, 0.1),
+            4 => (0.57, 0.1),
+            5 => (0.85, 0.1),
+            6 => (0.85, 0.3),
+            _ => (0.5, 0.5),
+        },
+        8 => match seat_index {
+            0 => (0.57, 0.7),
+            1 => (0.02, 0.7),
+            2 => (0.07, 0.3),
+            3 => (0.3, 0.1),
+            4 => (0.57, 0.1),
+            5 => (0.85, 0.1),
+            6 => (0.85, 0.3),
+            7 => (0.85, 0.7),
+            _ => (0.5, 0.5),
+        },
+        _ => (0.5, 0.5),
+    };
+    (
+        table.position.x as f64 + table.position.width as f64 * x_multiplier,
+        table.position.y as f64 + table.position.height as f64 * y_multiplier,
+    )
+}
+
 #[derive(Debug)]
 struct HudWindow {
     label: String,
     table: Table,
-    player: Player,
+    player: TablePlayer,
+    max_players: i32,
+    hero_seat: i32,
 }
 
 impl HudWindow {
     fn new(
         table: TableWindow,
-        player: Player,
+        player: TablePlayer,
+        max_players: i32,
+        hero_seat: i32,
         app_handle: AppHandle,
     ) -> Result<HudWindow, ApplicationError> {
         let window_label = Uuid::new_v4().to_string();
 
-        let hud_x = table.position.x as f64 + table.position.width as f64 / 2.0;
-        let hud_y = table.position.y as f64 + table.position.height as f64 / 2.0;
+        let (hud_x, hud_y) =
+            compute_hud_position(table.to_owned(), max_players, hero_seat, player.to_owned());
 
         let window = WindowBuilder::new(
             &app_handle,
@@ -351,6 +410,8 @@ impl HudWindow {
             label: window_label,
             table: table.table,
             player,
+            max_players,
+            hero_seat,
         })
     }
 }
@@ -358,7 +419,7 @@ impl HudWindow {
 struct TableHuds {
     table_window: TableWindow,
     huds: Vec<HudWindow>,
-    players: HashSet<Player>,
+    players: HashSet<TablePlayer>,
 }
 
 impl TableHuds {
@@ -366,50 +427,91 @@ impl TableHuds {
         table_window: TableWindow,
         app_handle: &AppHandle,
     ) -> Result<TableHuds, ApplicationError> {
-        let players: HashSet<Player> =
+        let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
+        let players: HashSet<TablePlayer> =
             HashSet::from_iter(get_table_players(table_window.table.to_owned())?);
-
-        let huds: Vec<HudWindow> = players
-            .iter()
-            .map(|p| HudWindow::new(table_window.to_owned(), p.to_owned(), app_handle.to_owned()))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(TableHuds {
-            table_window,
-            players,
-            huds,
-        })
+        let max_players_and_hero =
+            gui::get_table_max_players_and_hero(&mut conn, table_window.table.to_owned())?;
+        match max_players_and_hero {
+            Some((max_players, hero)) => {
+                let hero_seat = players
+                    .iter()
+                    .filter(|p| p.name == hero)
+                    .map(|p| p.seat_number)
+                    .next()
+                    .unwrap();
+                let huds: Vec<HudWindow> = players
+                    .iter()
+                    .map(|p| {
+                        HudWindow::new(
+                            table_window.to_owned(),
+                            p.to_owned(),
+                            max_players,
+                            hero_seat,
+                            app_handle.to_owned(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(TableHuds {
+                    table_window,
+                    players,
+                    huds,
+                })
+            }
+            None => Ok(TableHuds {
+                table_window,
+                players,
+                huds: vec![],
+            }),
+        }
     }
 
     fn update(&mut self, app_handle: &AppHandle) -> Result<(), ApplicationError> {
         let players =
             HashSet::from_iter(get_table_players(self.table_window.table.to_owned()).unwrap());
-        let new_players = players.difference(&self.players);
-        let players_left = self.players.difference(&players);
-        new_players.into_iter().for_each(|p| {
-            self.huds.push(
-                HudWindow::new(
-                    self.table_window.to_owned(),
-                    p.to_owned(),
-                    app_handle.to_owned(),
-                )
-                .unwrap(),
-            )
-        });
-        players_left.into_iter().for_each(|p| {
-            for hud in self.huds.iter() {
-                if hud.player == *p {
-                    let window = app_handle.get_window(hud.label.as_str());
-                    match window {
-                        Some(window) => window.close().unwrap(),
-                        None => {
-                            println!("Window {} not found", hud.label);
+        let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
+        let max_players =
+            gui::get_table_max_players_and_hero(&mut conn, self.table_window.table.to_owned())?;
+        match max_players {
+            Some((max_players, hero)) => {
+                let hero_seat = players
+                    .iter()
+                    .filter(|p| p.name == hero)
+                    .map(|p| p.seat_number)
+                    .next()
+                    .unwrap();
+                let new_players = players.difference(&self.players);
+                let players_left = self.players.difference(&players);
+                new_players.into_iter().for_each(|p| {
+                    self.huds.push(
+                        HudWindow::new(
+                            self.table_window.to_owned(),
+                            p.to_owned(),
+                            max_players,
+                            hero_seat,
+                            app_handle.to_owned(),
+                        )
+                        .unwrap(),
+                    )
+                });
+                players_left.into_iter().for_each(|p| {
+                    for hud in self.huds.iter() {
+                        if hud.player == *p {
+                            let window = app_handle.get_window(hud.label.as_str());
+                            match window {
+                                Some(window) => window.close().unwrap(),
+                                None => {
+                                    println!("Window {} not found", hud.label);
+                                }
+                            }
                         }
                     }
-                }
+                });
+                self.players = players;
+                Ok(())
             }
-        });
-        self.players = players;
-        Ok(())
+            None => Err::<(), ApplicationError>(ApplicationError::GetTableMaxPlayers),
+        }
     }
 
     fn close(&self, app_handle: &AppHandle) -> Result<(), ApplicationError> {

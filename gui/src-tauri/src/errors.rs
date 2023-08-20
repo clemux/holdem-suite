@@ -36,6 +36,8 @@ pub enum ApplicationError {
     // other errors
     #[error("Error loading players for table")]
     LoadPlayersForTable,
+    #[error("Error getting table max players")]
+    GetTableMaxPlayers,
 }
 
 impl serde::Serialize for ApplicationError {

@@ -19,7 +19,7 @@ use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, Window};
 use x11rb::rust_connection::RustConnection;
 
 use holdem_suite_db::models::Action;
-use holdem_suite_db::{insert_hands, insert_summary};
+use holdem_suite_db::{get_latest_hand, insert_hands, insert_summary};
 use holdem_suite_parser::parser::parse_hands;
 use holdem_suite_parser::summary_parser::TournamentSummary;
 
@@ -270,6 +270,25 @@ pub fn parse_file(
                 Ok(0)
             }
         }
+    }
+}
+
+pub fn get_table_max_players_and_hero(
+    conn: &mut SqliteConnection,
+    table: Table,
+) -> Result<Option<(i32, String)>, ApplicationError> {
+    let hand = match table {
+        Table::CashGame(name) => Some(get_latest_hand(conn, None, Some(name.clone()))?),
+        Table::Tournament { id, .. } => Some(get_latest_hand(conn, Some(id), None)?),
+        _ => None,
+    };
+    match hand {
+        Some(Some(hand)) => {
+            println!("Hand: {:?}", hand);
+            Ok(Some((hand.max_players, hand.hero.to_owned())))
+        }
+        Some(None) => Ok(None),
+        None => Err(ApplicationError::GetTableMaxPlayers),
     }
 }
 

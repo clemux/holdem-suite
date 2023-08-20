@@ -3,7 +3,9 @@ use diesel::prelude::*;
 use diesel::sqlite::Sqlite;
 use diesel::SqliteConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use gui::get_table_max_players_and_hero;
 use gui::parse_file;
+use gui::Table;
 use holdem_suite_db::models::Hand;
 use holdem_suite_db::schema::hands;
 use holdem_suite_db::{establish_connection, get_hands};
@@ -31,6 +33,9 @@ fn test_insert_hand() {
         tournament_id: None,
         cash_game_name: None,
         datetime: "2021-01-01 00:00:00".to_owned(),
+        button: 1,
+        max_players: 9,
+        hero: "WinterSound".to_owned(),
     };
     let inserted = diesel::insert_or_ignore_into(hands::table)
         .values(&hand)
@@ -41,7 +46,8 @@ fn test_insert_hand() {
 #[test]
 fn test_parse_file() {
     let mut conn = establish_test_connection();
-    let nb_parsed_hands = parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn);
+    let nb_parsed_hands =
+        parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn).unwrap();
     assert_eq!(3, nb_parsed_hands);
 
     let hands = get_hands(&mut conn).unwrap();
@@ -65,4 +71,20 @@ fn test_get_players() {
     parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn);
     let players = holdem_suite_db::get_players(&mut conn).unwrap();
     assert_eq!(7, players.len());
+}
+
+#[test]
+fn test_get_max_players_and_hero() {
+    let mut conn = establish_test_connection();
+    parse_file(PathBuf::from("tests/samples/sample1.txt"), &mut conn);
+    let table = Table::Tournament {
+        name: String::from("WESTERN"),
+        id: 655531954,
+        table: 77,
+    };
+    let (max_players, hero) = get_table_max_players_and_hero(&mut conn, table)
+        .unwrap()
+        .unwrap();
+    assert_eq!(6, max_players);
+    assert_eq!("NotWinterSound", hero);
 }
