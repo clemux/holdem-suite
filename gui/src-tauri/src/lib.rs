@@ -283,10 +283,7 @@ pub fn get_table_max_players_and_hero(
         _ => None,
     };
     match hand {
-        Some(Some(hand)) => {
-            println!("Hand: {:?}", hand);
-            Ok(Some((hand.max_players, hand.hero.to_owned())))
-        }
+        Some(Some(hand)) => Ok(Some((hand.max_players, hand.hero.to_owned()))),
         Some(None) => Ok(None),
         None => Err(ApplicationError::GetTableMaxPlayers),
     }

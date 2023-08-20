@@ -86,12 +86,10 @@ fn open_hud_command(
         println!("Error creating popup {:?}", e);
         "Error creating popup"
     })?;
-    println!("Opened window {:?}", window.label());
     let label = window_label.to_owned();
     window.once("hudReady", move |msg| {
         let window = handle.get_window(&label).unwrap();
         window.emit("hud", player).unwrap();
-        println!("Received {:?}", msg);
     });
 
     Ok(())
