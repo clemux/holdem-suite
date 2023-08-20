@@ -20,6 +20,9 @@ diesel::table! {
         tournament_id -> Nullable<Integer>,
         cash_game_name -> Nullable<Text>,
         datetime -> Text,
+        button -> Integer,
+        max_players -> Integer,
+        hero -> Text,
     }
 }
 

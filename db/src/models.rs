@@ -29,6 +29,9 @@ pub struct Hand {
     pub tournament_id: Option<i32>,
     pub cash_game_name: Option<String>,
     pub datetime: String,
+    pub button: i32,
+    pub max_players: i32,
+    pub hero: String,
 }
 
 #[derive(Identifiable, Queryable, Selectable, Associations, Debug, Serialize)]

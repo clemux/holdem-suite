@@ -67,6 +67,9 @@ pub fn insert_hands(
                         _ => None,
                     },
                     datetime: hand.hand_info.datetime.to_string(),
+                    max_players: hand.table_info.max_players as i32,
+                    button: hand.table_info.button as i32,
+                    hero: hand.dealt_cards.player_name.to_owned(),
                 })
                 .execute(conn)
                 .expect("Error saving new hands");
@@ -210,11 +213,17 @@ pub fn get_players(conn: &mut SqliteConnection) -> Result<Vec<Player>, DatabaseE
     Ok(seats.into_iter().map(|name| Player { name }).collect())
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, PartialEq, Eq, Hash)]
+pub struct TablePlayer {
+    pub name: String,
+    pub seat_number: i32,
+}
+
 pub fn get_players_for_table(
     conn: &mut SqliteConnection,
     tournament_id: Option<i32>,
     cash_game_name: Option<String>,
-) -> Result<Vec<Player>, DatabaseError> {
+) -> Result<Vec<TablePlayer>, DatabaseError> {
     let mut query = hands::dsl::hands.into_boxed();
     if let Some(tournament_id) = tournament_id {
         query = query.filter(hands::tournament_id.eq(tournament_id));
@@ -228,6 +237,15 @@ pub fn get_players_for_table(
         .load(conn)?;
     Ok(seats
         .into_iter()
-        .map(|Seat { player_name, .. }| Player { name: player_name })
+        .map(
+            |Seat {
+                 player_name,
+                 seat_number,
+                 ..
+             }| TablePlayer {
+                name: player_name,
+                seat_number,
+            },
+        )
         .collect())
 }

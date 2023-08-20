@@ -5,5 +5,8 @@ CREATE TABLE hands (
     hole_card_2 VARCHAR(2) NOT NULL,
     tournament_id INT NULL,
     cash_game_name TEXT NULL,
-    datetime TEXT NOT NULL
+    datetime TEXT NOT NULL,
+    button INTEGER NOT NULL,
+    max_players INTEGER NOT NULL,
+    hero TEXT NOT NULL
 )
