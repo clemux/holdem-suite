@@ -2,11 +2,18 @@ use holdem_suite_db::errors::DatabaseError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApplicationError {
+    // windows errors
+    #[cfg(target_os = "windows")]
+    #[error(transparent)]
+    WindowsCore(#[from] windows::core::Error),
     // x11rb errors
+    #[cfg(target_os = "linux")]
     #[error(transparent)]
     X11Connect(#[from] x11rb::errors::ConnectError),
+    #[cfg(target_os = "linux")]
     #[error(transparent)]
     X11Connection(#[from] x11rb::errors::ConnectionError),
+    #[cfg(target_os = "linux")]
     #[error(transparent)]
     X11Reply(#[from] x11rb::errors::ReplyError),
     #[error("win_name: _NET_WM_NAME is empty")]

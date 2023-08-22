@@ -10,26 +10,16 @@ use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 use uuid::Uuid;
-use x11rb::protocol::xproto::Window;
 
 use gui::errors::ApplicationError;
-use gui::{compute_hand_metrics, parse_file, Table, TableWindow, WindowGeometry, WindowManager};
+use gui::window_management::{TableWindow, WindowGeometry, WindowManager};
+use gui::{compute_hand_metrics, parse_file, Table};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
     get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, Player,
     TablePlayer,
 };
-
-x11rb::atom_manager! {
-    pub Atoms: AtomsCookie {
-        WM_PROTOCOLS,
-        WM_DELETE_WINDOW,
-        _NET_WM_NAME,
-        _NET_CLIENT_LIST,
-        UTF8_STRING,
-    }
-}
 
 #[derive(Clone)]
 struct Settings<'a> {
@@ -87,7 +77,7 @@ fn open_hud_command(
         "Error creating popup"
     })?;
     let label = window_label.to_owned();
-    window.once("hudReady", move |msg| {
+    window.once("hudReady", move |_| {
         let window = handle.get_window(&label).unwrap();
         window.emit("hud", player).unwrap();
     });
@@ -243,12 +233,16 @@ async fn close_splashscreen(window: tauri::Window) {
     window.get_window("main").unwrap().show().unwrap();
 }
 
-fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, event_tx: mpsc::Sender<()>) {
+fn watch<P: AsRef<Path>>(
+    path: P,
+    database_url: String,
+    app_handle: AppHandle,
+    event_tx: mpsc::Sender<()>,
+) {
     let (tx, rx) = mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
     let _ = watcher.watch(path.as_ref(), RecursiveMode::Recursive);
-    let database_url = "sqlite:///home/clemux/dev/holdem-suite/test.db";
-    let mut connection = establish_connection(database_url);
+    let mut connection = establish_connection(&database_url);
     for res in rx {
         match res {
             Ok(event) => match event.kind {
@@ -286,8 +280,11 @@ fn watch<P: AsRef<Path>>(path: P, app_handle: AppHandle, event_tx: mpsc::Sender<
     }
 }
 
-fn get_table_players(table: Table) -> Result<Vec<TablePlayer>, ApplicationError> {
-    let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
+fn get_table_players(
+    table: Table,
+    database_url: &str,
+) -> Result<Vec<TablePlayer>, ApplicationError> {
+    let mut conn = establish_connection(database_url);
     let players = match table {
         Table::CashGame(name) => get_players_for_table(&mut conn, None, Some(name.clone())),
         Table::Tournament { id, .. } => get_players_for_table(&mut conn, Some(id as i32), None),
@@ -424,10 +421,13 @@ impl TableHuds {
     fn new(
         table_window: TableWindow,
         app_handle: &AppHandle,
+        database_url: &str,
     ) -> Result<TableHuds, ApplicationError> {
-        let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
-        let players: HashSet<TablePlayer> =
-            HashSet::from_iter(get_table_players(table_window.table.to_owned())?);
+        let mut conn = establish_connection(database_url);
+        let players: HashSet<TablePlayer> = HashSet::from_iter(get_table_players(
+            table_window.table.to_owned(),
+            database_url,
+        )?);
         let max_players_and_hero =
             gui::get_table_max_players_and_hero(&mut conn, table_window.table.to_owned())?;
         match max_players_and_hero {
@@ -464,10 +464,15 @@ impl TableHuds {
         }
     }
 
-    fn update(&mut self, app_handle: &AppHandle) -> Result<(), ApplicationError> {
-        let players =
-            HashSet::from_iter(get_table_players(self.table_window.table.to_owned()).unwrap());
-        let mut conn = establish_connection("sqlite:///home/clemux/dev/holdem-suite/test.db");
+    fn update(
+        &mut self,
+        app_handle: &AppHandle,
+        database_url: &str,
+    ) -> Result<(), ApplicationError> {
+        let players = HashSet::from_iter(
+            get_table_players(self.table_window.table.to_owned(), database_url).unwrap(),
+        );
+        let mut conn = establish_connection(database_url);
         let max_players =
             gui::get_table_max_players_and_hero(&mut conn, self.table_window.table.to_owned())?;
         match max_players {
@@ -526,16 +531,16 @@ impl TableHuds {
     }
 }
 
-fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
-    let mut tables_windows: HashMap<Window, TableWindow> = HashMap::new();
-    let mut tables_huds: HashMap<Window, TableHuds> = HashMap::new();
+fn watch_windows(app_handle: AppHandle, database_url: String, event_rx: mpsc::Receiver<()>) {
+    let mut tables_windows: HashMap<Table, TableWindow> = HashMap::new();
+    let mut tables_huds: HashMap<Table, TableHuds> = HashMap::new();
     loop {
         let mut received_event = false;
         for _event in event_rx.try_iter() {
             if !received_event {
                 received_event = true;
                 for hud in tables_huds.values_mut() {
-                    match hud.update(&app_handle) {
+                    match hud.update(&app_handle, &database_url) {
                         Ok(_) => {}
                         Err(_) => {
                             println!("Error updating huds");
@@ -551,7 +556,7 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
                 continue;
             }
         };
-        let new_table_windows: Vec<TableWindow> = match wm.table_windows() {
+        let detected_table_windows: HashMap<Table, TableWindow> = match wm.table_windows() {
             Ok(tables) => tables,
             Err(_) => {
                 println!("Error getting table windows");
@@ -560,46 +565,48 @@ fn watch_windows(app_handle: AppHandle, event_rx: mpsc::Receiver<()>) {
         }
         .into_iter()
         .filter(|t| matches!(t.table, Table::CashGame(_) | Table::Tournament { .. }))
+        .map(|t| (t.table.to_owned(), t))
         .collect();
 
-        // closed windows
-        let new_table_window_ids: Vec<Window> =
-            new_table_windows.iter().map(|t| t.window).collect();
-        for table_window in tables_windows.keys() {
-            if !new_table_window_ids.contains(table_window) {
-                let huds = tables_huds.remove(table_window);
-                if let Some(huds) = huds {
-                    match huds.close(&app_handle) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            println!("Error closing huds");
-                        }
+        let current_tables: HashSet<Table> = HashSet::from_iter(tables_windows.keys().cloned());
+
+        let detected_tables: HashSet<Table> = HashSet::from_iter(
+            detected_table_windows
+                .iter()
+                .map(|(t, _)| t.to_owned())
+                .collect::<Vec<_>>(),
+        );
+        let new_tables = detected_tables.difference(&current_tables);
+        let tables_closed = current_tables.difference(&detected_tables);
+
+        // closed tables
+        for table in tables_closed {
+            let huds = tables_huds.remove(table);
+            if let Some(huds) = huds {
+                match huds.close(&app_handle) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        println!("Error closing huds");
                     }
                 }
             }
         }
 
         // new windows
-        for new_table_window in new_table_windows.iter() {
-            if !tables_windows.contains_key(&new_table_window.window) {
-                match TableHuds::new(new_table_window.clone(), &app_handle) {
-                    Ok(table_huds) => {
-                        tables_huds.insert(new_table_window.window, table_huds);
-                    }
-                    Err(_) => {
-                        println!("Error creating table huds");
-                        continue;
-                    }
+        for table in new_tables {
+            let new_table_window = detected_table_windows.get(table).unwrap();
+            match TableHuds::new(new_table_window.clone(), &app_handle, &database_url) {
+                Ok(table_huds) => {
+                    tables_huds.insert(table.to_owned(), table_huds);
+                }
+                Err(_) => {
+                    println!("Error creating table huds");
+                    continue;
                 }
             }
         }
-
-        // update
         tables_windows.clear();
-        tables_windows = new_table_windows
-            .into_iter()
-            .map(|t| (t.window, t))
-            .collect();
+        tables_windows = detected_table_windows;
         thread::sleep(std::time::Duration::from_secs(1));
     }
 }
@@ -626,17 +633,19 @@ fn setup_app(app: &App, settings: Settings) -> Result<(), Box<dyn std::error::Er
     let app_handle = app.handle();
     let watch_folder = settings.watch_folder.to_owned();
     let (tx, rx) = mpsc::channel();
-    thread::spawn(move || watch(watch_folder, app_handle, tx));
+    let database_url = settings.database_url.to_owned();
+    thread::spawn(move || watch(watch_folder, database_url, app_handle, tx));
     let app_handle = app.handle();
-    thread::spawn(move || watch_windows(app_handle, rx));
+    let database_url = settings.database_url.to_owned();
+    thread::spawn(move || watch_windows(app_handle, database_url, rx));
     Ok(())
 }
 
 fn main() {
     let settings = Settings {
-        database_url: "sqlite:///home/clemux/dev/holdem-suite/test.db",
+        database_url: r#"C:\Users\cleme\PycharmProjects\holdem-suite\db\test.db"#,
         watch_folder: Path::new(
-            "/home/clemux/.config/winamax/documents/accounts/WinterSound/history/",
+            r#"C:\Users\cleme\AppData\Roaming\winamax\documents\accounts\WinterSound\history\"#,
         ),
     };
     let settings2 = settings.clone();
