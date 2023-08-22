@@ -4,9 +4,11 @@ use nom::bytes::complete::{tag, take_until};
 use nom::character::complete::line_ending;
 use nom::combinator::{map, opt};
 use nom::multi::separated_list1;
-use nom::number::complete::float;
+use nom::number::complete::double;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple};
 use nom::IResult;
+use std::fmt;
+use std::fmt::Display;
 
 #[derive(Debug, PartialEq)]
 enum PokerType {
@@ -59,18 +61,44 @@ impl Level {
 
 #[derive(Debug, PartialEq)]
 pub enum TournamentType {
-    Sitngo,
-    Mtt,
+    DoubleOrNothing,
+    Freeroll100k,
+    HitnRun,
     Knockout,
+    MadTilt,
+    Normal,
+    Qualifier,
+    Sitngo,
     Unknown(String),
+}
+
+impl Display for TournamentType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TournamentType::DoubleOrNothing => write!(f, "don"),
+            TournamentType::Freeroll100k => write!(f, "freeroll100k"),
+            TournamentType::HitnRun => write!(f, "hitnrun"),
+            TournamentType::Knockout => write!(f, "knockout"),
+            TournamentType::MadTilt => write!(f, "madtilt"),
+            TournamentType::Normal => write!(f, "normal"),
+            TournamentType::Qualifier => write!(f, "qualifier"),
+            TournamentType::Sitngo => write!(f, "sitngo"),
+            TournamentType::Unknown(s) => write!(f, "unknown-{}", s),
+        }
+    }
 }
 
 impl TournamentType {
     fn parse(input: &str) -> IResult<&str, TournamentType> {
         let (input, tournament_type) = alt((
-            map(tag("sitngo"), |_| TournamentType::Sitngo),
-            map(tag("tt"), |_| TournamentType::Mtt),
+            map(tag("doubleornothing"), |_| TournamentType::DoubleOrNothing),
+            map(tag("freeroll100k"), |_| TournamentType::Freeroll100k),
+            map(tag("hitnrun"), |_| TournamentType::HitnRun),
             map(tag("knockout"), |_| TournamentType::Knockout),
+            map(tag("madtilt"), |_| TournamentType::MadTilt),
+            map(tag("normal"), |_| TournamentType::Normal),
+            map(tag("qualifier"), |_| TournamentType::Qualifier),
+            map(tag("sitngo"), |_| TournamentType::Sitngo),
             map(take_until("\n"), |s: &str| {
                 TournamentType::Unknown(s.to_string())
             }),
@@ -91,22 +119,22 @@ pub struct TournamentSummary {
     pub speed: String,
     pub flight_id: u32,
     pub levels: Vec<Level>,
-    pub prizepool: f32,
+    pub prizepool: f64,
     pub date: String,
     pub play_time: String,
     pub finish_place: u32,
-    pub won: Option<f32>,
+    pub won: Option<f64>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct BuyIn {
-    buy_in: f32,
-    rake: f32,
-    bounty: Option<f32>,
+    pub buy_in: f64,
+    pub rake: f64,
+    pub bounty: Option<f64>,
 }
 
-fn parse_amount(input: &str) -> IResult<&str, f32> {
-    let (input, amount) = terminated(float, opt(tag("€")))(input)?;
+fn parse_amount(input: &str) -> IResult<&str, f64> {
+    let (input, amount) = terminated(double, opt(tag("€")))(input)?;
     Ok((input, amount))
 }
 
@@ -176,7 +204,7 @@ impl TournamentSummary {
             ),
             delimited(
                 tag("Prizepool : "),
-                terminated(float, opt(tag("€"))),
+                terminated(double, opt(tag("€"))),
                 line_ending,
             ),
             delimited(tag("Tournament started "), take_until("\n"), line_ending),
@@ -281,7 +309,10 @@ mod tests {
             TournamentType::parse("sitngo"),
             Ok(("", TournamentType::Sitngo))
         );
-        assert_eq!(TournamentType::parse("tt"), Ok(("", TournamentType::Mtt)));
+        assert_eq!(
+            TournamentType::parse("normal"),
+            Ok(("", TournamentType::Normal))
+        );
     }
 
     #[test]
