@@ -15,7 +15,15 @@ pub struct Summary {
 pub struct NewSummary {
     pub id: i32,
     pub name: String,
+    pub buyin: f64,
+    pub date: String,
+    pub play_time: String,
+    pub entries: i32,
+    pub mode: String,
+    pub tournament_type: String,
+    pub speed: String,
     pub finish_place: i32,
+    pub won: Option<f64>,
 }
 
 #[derive(Identifiable, Insertable, Queryable, Selectable, Debug, Serialize)]

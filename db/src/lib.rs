@@ -29,7 +29,15 @@ pub fn insert_summary(
     let new_summary = models::NewSummary {
         id: summary.id as i32,
         name: summary.name,
+        buyin: summary.buy_in.buy_in,
+        date: summary.date,
+        play_time: summary.play_time,
+        entries: summary.entries as i32,
+        mode: summary.mode,
+        tournament_type: summary.tournament_type.to_string(),
+        speed: summary.speed,
         finish_place: summary.finish_place as i32,
+        won: summary.won,
     };
     Ok(diesel::insert_into(summaries::table)
         .values(&new_summary)

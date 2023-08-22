@@ -40,7 +40,15 @@ diesel::table! {
     summaries (id) {
         id -> Integer,
         name -> Text,
+        buyin -> Double,
+        date -> Text,
+        play_time -> Text,
+        entries -> Integer,
+        mode -> Text,
+        tournament_type -> Text,
+        speed -> Text,
         finish_place -> Integer,
+        won -> Nullable<Double>,
     }
 }
 
