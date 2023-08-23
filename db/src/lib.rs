@@ -26,7 +26,7 @@ pub fn insert_summary(
     conn: &mut SqliteConnection,
     summary: summary_parser::TournamentSummary,
 ) -> Result<usize, DatabaseError> {
-    let new_summary = models::NewSummary {
+    let new_summary = Summary {
         id: summary.id as i32,
         name: summary.name,
         buyin: summary.buy_in.buy_in,

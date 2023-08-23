@@ -1,20 +1,13 @@
 use diesel::prelude::*;
 use serde::Serialize;
 
-#[derive(Queryable, Selectable, Debug, Serialize)]
+#[derive(Queryable, Selectable, Insertable, Debug, Serialize)]
 #[diesel(table_name = crate::schema::summaries)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Summary {
     pub id: i32,
     pub name: String,
     pub finish_place: i32,
-}
-
-#[derive(Insertable)]
-#[diesel(table_name = crate::schema::summaries)]
-pub struct NewSummary {
-    pub id: i32,
-    pub name: String,
     pub buyin: f64,
     pub date: String,
     pub play_time: String,
@@ -22,7 +15,6 @@ pub struct NewSummary {
     pub mode: String,
     pub tournament_type: String,
     pub speed: String,
-    pub finish_place: i32,
     pub won: Option<f64>,
 }
 
