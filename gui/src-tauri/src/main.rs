@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{App, AppHandle, CustomMenuItem, Manager, Menu, Submenu, WindowBuilder};
 use uuid::Uuid;
 
@@ -21,10 +21,10 @@ use holdem_suite_db::{
     TablePlayer,
 };
 
-#[derive(Clone)]
-struct Settings<'a> {
-    database_url: &'a str,
-    watch_folder: &'a Path,
+#[derive(Clone, Deserialize, Serialize)]
+struct Settings {
+    database_url: String,
+    watch_folder: String,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -87,19 +87,19 @@ fn open_hud_command(
 
 #[tauri::command]
 fn load_summaries(state: tauri::State<Settings>) -> Result<Vec<Summary>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     Ok(get_summaries(&mut conn)?)
 }
 
 #[tauri::command]
 fn load_hands(state: tauri::State<Settings>) -> Result<Vec<Hand>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     Ok(get_hands(&mut conn)?)
 }
 
 #[tauri::command]
 fn load_seats(hand_id: &str, state: tauri::State<Settings>) -> Result<Vec<Seat>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     let seats = get_seats(&mut conn, hand_id)?;
     Ok(seats)
 }
@@ -109,13 +109,13 @@ fn load_actions(
     hand_id: &str,
     state: tauri::State<Settings>,
 ) -> Result<Vec<Action>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     Ok(get_actions_for_hand(&mut conn, hand_id)?)
 }
 
 #[tauri::command]
 fn load_players(state: tauri::State<Settings>) -> Result<Vec<Player>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     Ok(get_players(&mut conn)?)
 }
 
@@ -133,7 +133,7 @@ fn load_player_stats(
     player_name: String,
     state: tauri::State<Settings>,
 ) -> Result<PlayerStats, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     let mut stats = PlayerStats {
         vpip: 0.0,
         pfr: 0.0,
@@ -171,7 +171,7 @@ fn load_players_for_table(
     state: tauri::State<Settings>,
     table: Table,
 ) -> Result<Vec<TablePlayer>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     match table {
         Table::CashGame(name) => Ok(get_players_for_table(&mut conn, None, Some(name.clone()))?),
         Table::Tournament { id, .. } => {
@@ -186,7 +186,7 @@ fn get_latest_actions(
     table: Table,
     state: tauri::State<Settings>,
 ) -> Result<Vec<Action>, ApplicationError> {
-    let mut conn = establish_connection(state.database_url);
+    let mut conn = establish_connection(&state.database_url);
     match table {
         Table::CashGame(name) => match get_latest_hand(&mut conn, None, Some(name))? {
             Some(hand) => Ok(get_actions(&mut conn, hand.id)?),
@@ -572,8 +572,8 @@ fn watch_windows(app_handle: AppHandle, database_url: String, event_rx: mpsc::Re
 
         let detected_tables: HashSet<Table> = HashSet::from_iter(
             detected_table_windows
-                .iter()
-                .map(|(t, _)| t.to_owned())
+                .keys()
+                .map(|t| t.to_owned())
                 .collect::<Vec<_>>(),
         );
         let new_tables = detected_tables.difference(&current_tables);
@@ -642,12 +642,10 @@ fn setup_app(app: &App, settings: Settings) -> Result<(), Box<dyn std::error::Er
 }
 
 fn main() {
-    let settings = Settings {
-        database_url: r#"C:\Users\cleme\PycharmProjects\holdem-suite\db\test.db"#,
-        watch_folder: Path::new(
-            r#"C:\Users\cleme\AppData\Roaming\winamax\documents\accounts\WinterSound\history\"#,
-        ),
-    };
+    let settings_file =
+        std::fs::read_to_string("settings.toml").expect("Unable to read settings.toml");
+    let settings: Settings = toml::from_str(&settings_file).expect("Unable to parse settings.toml");
+
     let settings2 = settings.clone();
     tauri::Builder::default()
         .setup(move |app| setup_app(app, settings2))

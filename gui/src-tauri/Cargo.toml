@@ -24,6 +24,7 @@ anyhow = "1.0.72"
 thiserror = "1.0.46"
 diesel = { version = "2.1.0", features = ["sqlite"] }
 uuid = { version = "1.4.1", features = ["v4"] }
+toml = "0.7.6"
 
 [target.'cfg(unix)'.dependencies]
 x11rb = "0.12.0"

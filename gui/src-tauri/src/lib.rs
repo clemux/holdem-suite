@@ -27,7 +27,6 @@ pub mod errors;
 #[cfg_attr(target_os = "windows", path = "window_management_windows.rs")]
 pub mod window_management;
 
-
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Eq, Hash)]
 pub enum Table {
     CashGame(String),
@@ -76,8 +75,6 @@ impl FromStr for Table {
         Ok(table)
     }
 }
-
-
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct PlayerMetrics {
