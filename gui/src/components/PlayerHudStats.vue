@@ -40,20 +40,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="row">
-  </div>
   <table v-if="stats" @click="openPopup()">
     <tr>
       <td colspan="3">{{ player.name }}</td>
       <td>{{ stats.nb_hands }}</td>
     </tr>
     <tr>
-      <td>
+      <td title="VPIP">
         {{ (stats.vpip * 100).toFixed(0) }}
       </td>
-      <td>{{ (stats.pfr * 100).toFixed(0) }}</td>
-      <td class="text-red">{{ (stats.three_bet * 100).toFixed(1) }}</td>
-      <td>{{ (stats.open_limp * 100).toFixed(0) }}</td>
+      <td title="PFR">{{ (stats.pfr * 100).toFixed(0) }}</td>
+      <td class="text-red" title="3-Bet">{{ (stats.three_bet * 100).toFixed(1) }}</td>
+      <td class="tooltip" title="Open Limp">{{ (stats.open_limp * 100).toFixed(0) }}</td>
     </tr>
   </table>
 </template>
