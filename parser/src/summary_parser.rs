@@ -1,8 +1,10 @@
+use chrono::prelude::*;
+
 use nom;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
-use nom::character::complete::line_ending;
-use nom::combinator::{map, opt};
+use nom::character::complete::{line_ending, not_line_ending};
+use nom::combinator::{map, map_res, opt};
 use nom::multi::separated_list1;
 use nom::number::complete::double;
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple};
@@ -120,7 +122,7 @@ pub struct TournamentSummary {
     pub flight_id: u32,
     pub levels: Vec<Level>,
     pub prizepool: f64,
-    pub date: String,
+    pub date: DateTime<Utc>,
     pub play_time: String,
     pub finish_place: u32,
     pub won: Option<f64>,
@@ -156,6 +158,13 @@ impl BuyIn {
 
 impl TournamentSummary {
     pub fn parse(input: &str) -> IResult<&str, TournamentSummary> {
+        let tournament_start = delimited(
+            tag("Tournament started "),
+            map_res(not_line_ending, |s: &str| {
+                Utc.datetime_from_str(s, "%Y/%m/%d %H:%M:%S %Z")
+            }),
+            line_ending,
+        );
         let (
             input,
             (
@@ -207,7 +216,7 @@ impl TournamentSummary {
                 terminated(double, opt(tag("€"))),
                 line_ending,
             ),
-            delimited(tag("Tournament started "), take_until("\n"), line_ending),
+            tournament_start,
             delimited(tag("You played "), take_until("\n"), line_ending),
             delimited(
                 tag("You finished in "),
@@ -350,7 +359,7 @@ mod tests {
                 },
             ],
             prizepool: 198.70,
-            date: String::from("2023/07/08 11:30:00 UTC"),
+            date: Utc.with_ymd_and_hms(2023, 7, 8, 11, 30, 0).unwrap(),
             play_time: String::from("20min 52s "),
             finish_place: 145,
             won: Some(1.0),
