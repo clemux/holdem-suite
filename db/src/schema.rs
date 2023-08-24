@@ -41,7 +41,7 @@ diesel::table! {
         id -> Integer,
         name -> Text,
         buyin -> Double,
-        date -> Text,
+        date -> Timestamp,
         play_time -> Text,
         entries -> Integer,
         mode -> Text,

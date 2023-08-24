@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::Serialize;
 
@@ -9,7 +10,7 @@ pub struct Summary {
     pub name: String,
     pub finish_place: i32,
     pub buyin: f64,
-    pub date: String,
+    pub date: NaiveDateTime,
     pub play_time: String,
     pub entries: i32,
     pub mode: String,

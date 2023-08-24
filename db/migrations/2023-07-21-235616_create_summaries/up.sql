@@ -3,7 +3,7 @@ CREATE TABLE summaries (
     id integer PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     buyin DOUBLE NOT NULL,
-    date TEXT NOT NULL,
+    date DATETIME NOT NULL,
     play_time TEXT NOT NULL,
     entries INTEGER NOT NULL,
     mode TEXT NOT NULL,

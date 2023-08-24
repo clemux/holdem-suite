@@ -30,7 +30,7 @@ pub fn insert_summary(
         id: summary.id as i32,
         name: summary.name,
         buyin: summary.buy_in.buy_in,
-        date: summary.date,
+        date: summary.date.naive_local(),
         play_time: summary.play_time,
         entries: summary.entries as i32,
         mode: summary.mode,

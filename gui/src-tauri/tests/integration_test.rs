@@ -1,4 +1,5 @@
 #[cfg(test)]
+use chrono::prelude::*;
 use diesel::prelude::*;
 use diesel::sqlite::Sqlite;
 use diesel::SqliteConnection;
@@ -6,9 +7,9 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use gui::get_table_max_players_and_hero;
 use gui::parse_file;
 use gui::Table;
-use holdem_suite_db::models::Hand;
+use holdem_suite_db::models::{Hand, Summary};
 use holdem_suite_db::schema::hands;
-use holdem_suite_db::{establish_connection, get_hands};
+use holdem_suite_db::{establish_connection, get_hands, get_summaries};
 use std::path::PathBuf;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../../db/migrations/");
@@ -87,4 +88,29 @@ fn test_get_max_players_and_hero() {
         .unwrap();
     assert_eq!(6, max_players);
     assert_eq!("NotWinterSound", hero);
+}
+
+#[test]
+fn test_insert_and_get_summary() {
+    let mut conn = establish_test_connection();
+    parse_file(
+        PathBuf::from("tests/samples/tournament_summary.txt"),
+        &mut conn,
+    )
+    .expect("Error parsing tournament summary");
+    let summaries = get_summaries(&mut conn).unwrap();
+    assert_eq!(1, summaries.len());
+    let summary = &summaries[0];
+    assert_eq!("MYSTERY KO", summary.name);
+    assert_eq!(669464094, summary.id);
+    assert_eq!(145, summary.finish_place);
+    assert_eq!(1.00, summary.won.unwrap());
+    assert_eq!("knockout", summary.tournament_type);
+    assert_eq!(
+        NaiveDate::from_ymd_opt(2023, 7, 8)
+            .unwrap()
+            .and_hms_opt(11, 30, 0)
+            .unwrap(),
+        summary.date
+    );
 }

@@ -1,0 +1,15 @@
+Winamax Poker - Tournament summary : MYSTERY KO(669464094) - Late Registration
+Player : WinterSound
+Buy-In : 0.60€ + 0.30€ + 0.10€
+Registered players : 160
+Mode : tt
+Type : knockout
+Speed : normal
+Flight ID : 0
+Levels : Levels : [100-200:25:2100:holdem-no-limit,125-250:30:420:holdem-no-limit]
+Prizepool : 198.70€
+Tournament started 2023/07/08 11:30:00 UTC
+You played 20min 52s 
+You finished in 145th place
+You won 1.00€
+
