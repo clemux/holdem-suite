@@ -8,5 +8,8 @@ CREATE TABLE hands (
     datetime TEXT NOT NULL,
     button INTEGER NOT NULL,
     max_players INTEGER NOT NULL,
-    hero TEXT NOT NULL
+    hero TEXT NOT NULL,
+    ante DOUBLE NULL,
+    small_blind DOUBLE NOT NULL,
+    big_blind DOUBLE NOT NULL
 )

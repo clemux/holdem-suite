@@ -80,9 +80,9 @@ impl GameInfo {
 
 #[derive(Debug, PartialEq)]
 pub struct Blinds {
-    ante: Option<f64>,
-    small_blind: f64,
-    big_blind: f64,
+    pub ante: Option<f64>,
+    pub small_blind: f64,
+    pub big_blind: f64,
 }
 
 fn parse_blind(input: &str) -> IResult<&str, f64> {

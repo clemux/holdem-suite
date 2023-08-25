@@ -23,6 +23,9 @@ diesel::table! {
         button -> Integer,
         max_players -> Integer,
         hero -> Text,
+        ante -> Nullable<Double>,
+        small_blind -> Double,
+        big_blind -> Double,
     }
 }
 

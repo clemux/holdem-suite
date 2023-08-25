@@ -33,6 +33,9 @@ pub struct Hand {
     pub button: i32,
     pub max_players: i32,
     pub hero: String,
+    pub ante: Option<f64>,
+    pub small_blind: f64,
+    pub big_blind: f64,
 }
 
 #[derive(Identifiable, Queryable, Selectable, Associations, Debug, Serialize)]

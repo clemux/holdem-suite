@@ -78,6 +78,9 @@ pub fn insert_hands(
                     max_players: hand.table_info.max_players as i32,
                     button: hand.table_info.button as i32,
                     hero: hand.dealt_cards.player_name.to_owned(),
+                    ante: hand.hand_info.blinds.ante,
+                    small_blind: hand.hand_info.blinds.small_blind,
+                    big_blind: hand.hand_info.blinds.big_blind,
                 })
                 .execute(conn)
                 .expect("Error saving new hands");
