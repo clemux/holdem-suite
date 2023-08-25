@@ -30,6 +30,7 @@ export type Hand = {
     tournament_id: number,
     cash_game_name: string,
     datetime: string,
+    max_players: number,
 }
 
 export type Seat = {

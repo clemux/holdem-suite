@@ -29,7 +29,7 @@ const selectedHand = ref<Hand[]>([]);
 const initialPagination = {
   sortBy: 'datetime',
   descending: true,
-  rowsPerPage: 5
+  rowsPerPage: 1
 }
 
 async function listenWatcherEvent() {
