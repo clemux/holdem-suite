@@ -23,7 +23,7 @@ defineProps<{
 div#container {
   height: 209px;
   width: 400px;
-  background-image: url("dist/assets/table.png");
+  background-image: url("/table.png");
   background-size: 400px;
   position: relative;
   margin-left: 200px;
