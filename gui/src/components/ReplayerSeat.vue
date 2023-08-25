@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import {Seat} from "../lib/types";
-import {computed} from "vue";
+import {computed, onMounted} from "vue";
+import Card from "./Card.vue";
 
 const props = defineProps<{
   seat: Seat;
   maxPlayers: number,
+  position: number,
+  cards: [string, string] | null,
+  isActive: boolean,
 }>();
 
 const W = 207;
@@ -77,8 +81,13 @@ const translateStyle = computed(() => {
 
 </script>
 <template>
-  <div class="seat" :id="seat.seat_number" :style=translateStyle>
+  <div class="seat" :id="seat.seat_number" :style=translateStyle :class="{ active: isActive}">
     {{ seat.player_name }}
+    <br>
+    <div v-if="cards" class="cards">
+      <Card class="card card1" :text="cards[0]"/>
+      <Card class="card card2" :text="cards[1]"/>
+    </div>
   </div>
 </template>
 <style scoped>
@@ -86,10 +95,29 @@ const translateStyle = computed(() => {
 .seat {
   height: 30px;
   width: 80px;
-  background-color: #81d4fa;
+  background-color: #d0dbe1;
   position: absolute;
   text-align: center;
   top: 50%;
   left: 50%;
+}
+
+.active {
+  background-color: #0c97e3;
+}
+
+.card {
+  background: white;
+  position: absolute;
+  bottom: 110%;
+  width: 20px;
+}
+
+.card1 {
+  left: 0;
+}
+
+.card2 {
+  left: 25px;
 }
 </style>

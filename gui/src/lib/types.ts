@@ -31,6 +31,7 @@ export type Hand = {
     cash_game_name: string,
     datetime: string,
     max_players: number,
+    hero: string,
 }
 
 export type Seat = {
@@ -49,4 +50,9 @@ export type Action = {
     action_type: string,
     amount: number,
     is_allin: boolean,
+}
+
+export type Card = {
+    suit: string,
+    rank: string,
 }
