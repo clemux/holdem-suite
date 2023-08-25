@@ -66,20 +66,11 @@ const pos = function (x: number): [number, number] {
   }
 }
 
-const translate_x = function (n: number): number {
-  let i = n - 1;
-  return pos(i / props.maxPlayers * D)[0];
-}
-
-const translate_y = function (n: number): number {
-  let i = n - 1;
-  return -pos(i / props.maxPlayers * D)[1];
-}
-
 
 const translateStyle = computed(() => {
+  const [translate_x, translate_y] = pos(props.position / props.maxPlayers * D);
   return {
-    transform: 'translate(' + (translate_x(props.seat.seat_number) - 40) + 'px, ' + (translate_y(props.seat.seat_number) - 15) + 'px)',
+    transform: 'translate(' + (translate_x - 40) + 'px, ' + (-translate_y - 15) + 'px)',
   }
 });
 
