@@ -146,6 +146,14 @@ pub fn get_hands(conn: &mut SqliteConnection) -> Result<Vec<Hand>, DatabaseError
         .load(conn)?)
 }
 
+pub fn get_hands_for_tournament(conn: &mut SqliteConnection, id: i32) -> Result<Vec<Hand>, DatabaseError> {
+    Ok(hands::dsl::hands
+        .filter(hands::dsl::tournament_id.eq(id))
+        .select(Hand::as_select())
+        .order(hands::datetime.desc())
+        .load(conn)?)
+}
+
 pub fn get_hands_for_player(
     conn: &mut SqliteConnection,
     player_name: &str,

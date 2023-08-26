@@ -19,7 +19,7 @@ pub struct Summary {
     pub won: Option<f64>,
 }
 
-#[derive(Identifiable, Insertable, Queryable, Selectable, Debug, Serialize)]
+#[derive(Identifiable, Insertable, Queryable, Selectable, Debug, Serialize, Clone)]
 #[diesel(table_name = crate::schema::hands)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[diesel(treat_none_as_default_value = false)]
