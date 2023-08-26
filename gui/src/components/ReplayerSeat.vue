@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {Seat} from "../lib/types";
-import {computed, onMounted} from "vue";
+import {computed} from "vue";
 import Card from "./Card.vue";
 
 const props = defineProps<{

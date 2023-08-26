@@ -49,7 +49,7 @@ export type Action = {
     street: string,
     action_type: string,
     amount: number,
-    is_allin: boolean,
+    is_all_in: boolean,
 }
 
 export type Card = {

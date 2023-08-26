@@ -12,7 +12,7 @@ const props = defineProps<{
   actions: Action[];
 }>();
 
-const position = function(seat_number: number): number {
+const position = function (seat_number: number): number {
   let hero_seat = props.seats.find(seat => seat.player_name == props.hand.hero)?.seat_number;
   return (seat_number + (props.hand.max_players - hero_seat)) % props.hand.max_players;
 }
@@ -23,13 +23,17 @@ const holeCards = computed<[string, string]>(() => {
 })
 
 async function nextAction() {
-  currentActionIndex.value++;
-  pot.value += props.actions[currentActionIndex.value].amount;
+  if (currentActionIndex.value < props.actions.length) {
+    currentActionIndex.value++;
+    pot.value += props.actions[currentActionIndex.value].amount;
+  }
 }
 
 async function previousAction() {
-  currentActionIndex.value--;
-  pot.value -= props.actions[currentActionIndex.value].amount;
+  if (currentActionIndex.value > 0) {
+    currentActionIndex.value--;
+    pot.value -= props.actions[currentActionIndex.value].amount;
+  }
 }
 
 async function firstAction() {
@@ -59,12 +63,12 @@ watch(() => props.actions, async (_, __) => {
       <span>{{ pot }}</span>
     </div>
     <div id="action">
-      <span>{{ currentAction.action_type }} {{ currentAction.amount }}</span>
+      <span>{{ currentAction.action_type }} {{ currentAction.amount }} ({{ currentAction.is_all_in }})</span>
     </div>
     <div v-for="seat in seats">
       <ReplayerSeat :seat="seat" :maxPlayers="hand.max_players" :position="position(seat.seat_number)"
-       :isActive="seat.player_name == currentPlayer"
-      :cards="holeCards"
+                    :isActive="seat.player_name == currentPlayer"
+                    :cards="holeCards"
       />
     </div>
   </div>
@@ -75,6 +79,8 @@ watch(() => props.actions, async (_, __) => {
   </div>
   <div>
     Current player {{ currentPlayer }}
+    <br>
+    Current street {{ currentAction.street }}
   </div>
 </template>
 
