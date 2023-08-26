@@ -17,8 +17,8 @@ use gui::{compute_hand_metrics, parse_file, Table};
 use holdem_suite_db::models::{Action, Hand, Seat, Summary};
 use holdem_suite_db::{
     establish_connection, get_actions, get_actions_for_hand, get_hands, get_hands_for_player,
-    get_latest_hand, get_players, get_players_for_table, get_seats, get_summaries, Player,
-    TablePlayer,
+    get_hands_for_tournament, get_latest_hand, get_players, get_players_for_table, get_seats,
+    get_summaries, Player, TablePlayer,
 };
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -47,6 +47,32 @@ fn open_popup(player: Player, handle: AppHandle) -> Result<(), ApplicationError>
     window.once("popupReady", move |_msg| {
         let window = handle.get_window(&label).unwrap(); // TODO: how to handle errors here?
         window.emit("popup", player).unwrap();
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn open_replayer(
+    tournament_id: i32,
+    state: tauri::State<Settings>,
+    handle: AppHandle,
+) -> Result<(), ApplicationError> {
+    let window = WindowBuilder::new(
+        &handle,
+        "replayer",
+        tauri::WindowUrl::App("replayer.html".into()),
+    )
+    .decorations(false)
+    .inner_size(800.0, 600.0)
+    .resizable(true)
+    .build()?;
+    let label = window.label().to_owned();
+    let mut conn = establish_connection(&state.database_url);
+    let hands = get_hands_for_tournament(&mut conn, tournament_id)?;
+    window.once("replayerReady", move |_msg| {
+        let window = handle.get_window(&label).unwrap(); // TODO: how to handle errors here?
+        window.emit("replayer", hands).unwrap();
     });
 
     Ok(())
@@ -673,6 +699,7 @@ fn main() {
             load_actions,
             open_popup,
             open_hud_command,
+            open_replayer,
         ])
         .manage(settings)
         .run(tauri::generate_context!())

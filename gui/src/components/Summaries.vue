@@ -26,6 +26,11 @@ const rows = ref([]);
 async function loadSummaries() {
   rows.value = await invoke("load_summaries", {});
 }
+
+async function openReplayer(_: Event, row: any, __: number) {
+  console.log(row.id);
+  await invoke("open_replayer", {tournamentId: row.id});
+}
 </script>
 
 <template>
@@ -35,6 +40,7 @@ async function loadSummaries() {
       :rows="rows"
       :columns="columns"
       row-key="id"
+      @row-dblclick="openReplayer"
     />
     <form class="row" @submit.prevent="loadSummaries">
       <button type="submit">Load</button>
