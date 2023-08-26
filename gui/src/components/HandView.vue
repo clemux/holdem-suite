@@ -35,25 +35,25 @@ onMounted(() => {
 
 <template>
   <div>
-  <p>Hand {{ hand.id }} ({{ hand.datetime }}</p>
+    <p>Hand {{ hand.id }} ({{ hand.datetime }}</p>
     <q-tabs v-model="tab">
       <q-tab name="text">Text</q-tab>
       <q-tab name="replayer">Replayer</q-tab>
     </q-tabs>
     <q-tab-panels v-model="tab">
       <q-tab-panel name="text">
-  <ul>
-    <li v-for="seat in seats">
-      {{ seat.player_name }} ({{ seat.stack }}) <span v-if="seat.bounty">{{ seat.bounty }}</span></li>
-  </ul>
-  <ul>
-    <li v-for="action in actions">
-      {{ action.player_name }} {{ action.action_type }} {{ action.amount }}
-    </li>
-  </ul>
+        <ul>
+          <li v-for="seat in seats">
+            {{ seat.player_name }} ({{ seat.stack }}) <span v-if="seat.bounty">{{ seat.bounty }}</span></li>
+        </ul>
+        <ul>
+          <li v-for="action in actions">
+            {{ action.player_name }} {{ action.action_type }} {{ action.amount }}
+          </li>
+        </ul>
       </q-tab-panel>
       <q-tab-panel name="replayer">
-        <Replayer :hand="hand" :seats="seats" :actions="actions" />
+        <Replayer :hand="hand" :seats="seats" :actions="actions"/>
       </q-tab-panel>
     </q-tab-panels>
   </div>
