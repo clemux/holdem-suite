@@ -74,7 +74,7 @@ const pos = function (x: number): [number, number] {
 const translateStyle = computed(() => {
   const [translate_x, translate_y] = pos(props.position / props.maxPlayers * D);
   return {
-    transform: 'translate(' + (translate_x - 40) + 'px, ' + (-translate_y - 15) + 'px)',
+    transform: 'translate(' + (translate_x - 40) + 'px, ' + (-translate_y - 20) + 'px)',
   }
 });
 
@@ -82,7 +82,8 @@ const translateStyle = computed(() => {
 </script>
 <template>
   <div class="seat" :id="seat.seat_number" :style=translateStyle :class="{ active: isActive}">
-    {{ seat.player_name }}
+    <div class="playerName">{{ seat.player_name }}</div>
+    <div class="playerStack">{{ seat.stack }}</div>
     <br>
     <div v-if="cards" class="cards">
       <Card class="card card1" :text="cards[0]"/>
@@ -93,7 +94,7 @@ const translateStyle = computed(() => {
 <style scoped>
 
 .seat {
-  height: 30px;
+  height: 40px;
   width: 80px;
   background-color: #d0dbe1;
   position: absolute;

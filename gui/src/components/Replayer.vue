@@ -50,7 +50,8 @@ const currentPlayer = computed<string>(() => {
 });
 
 
-watch(() => props.actions, async (_, __) => {
+watch(() => props.hand, async (_, __) => {
+  // TODO: add blinds/ante to pot
   await firstAction();
 });
 
