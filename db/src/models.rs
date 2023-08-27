@@ -36,6 +36,13 @@ pub struct Hand {
     pub ante: Option<f64>,
     pub small_blind: f64,
     pub big_blind: f64,
+    pub pot: f64,
+    pub rake: Option<f64>,
+    pub flop1: Option<String>,
+    pub flop2: Option<String>,
+    pub flop3: Option<String>,
+    pub turn: Option<String>,
+    pub river: Option<String>,
 }
 
 #[derive(Identifiable, Queryable, Selectable, Associations, Debug, Serialize)]

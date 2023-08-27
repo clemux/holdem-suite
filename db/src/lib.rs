@@ -1,14 +1,13 @@
-use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel::SqliteConnection;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::DatabaseError;
 use holdem_suite_parser::parser;
 use holdem_suite_parser::parser::ActionType;
 use holdem_suite_parser::summary_parser;
 
+use crate::errors::DatabaseError;
 use crate::models::{Action, Hand, NewAction, Seat, Summary};
 use crate::schema::*;
 
@@ -17,9 +16,8 @@ pub mod models;
 pub mod schema;
 
 pub fn establish_connection(database_url: &str) -> SqliteConnection {
-    let mut connection = SqliteConnection::establish(database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
-    connection
+    SqliteConnection::establish(database_url)
+        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
 pub fn insert_summary(
@@ -49,6 +47,12 @@ pub fn get_summaries(conn: &mut SqliteConnection) -> Result<Vec<Summary>, Databa
     Ok(summaries::dsl::summaries
         .select(Summary::as_select())
         .load(conn)?)
+}
+
+fn get_board_card(hand: &parser::Hand, n: usize) -> Option<String> {
+    hand.summary.board.as_ref()?.cards[n]
+        .as_ref()
+        .map(|card| card.to_string())
 }
 
 pub fn insert_hands(
@@ -81,6 +85,13 @@ pub fn insert_hands(
                     ante: hand.hand_info.blinds.ante,
                     small_blind: hand.hand_info.blinds.small_blind,
                     big_blind: hand.hand_info.blinds.big_blind,
+                    pot: hand.summary.pot,
+                    rake: hand.summary.rake,
+                    flop1: get_board_card(hand, 0).to_owned(),
+                    flop2: get_board_card(hand, 1).to_owned(),
+                    flop3: get_board_card(hand, 2).to_owned(),
+                    turn: get_board_card(hand, 3).to_owned(),
+                    river: get_board_card(hand, 4).to_owned(),
                 })
                 .execute(conn)
                 .expect("Error saving new hands");
@@ -146,7 +157,10 @@ pub fn get_hands(conn: &mut SqliteConnection) -> Result<Vec<Hand>, DatabaseError
         .load(conn)?)
 }
 
-pub fn get_hands_for_tournament(conn: &mut SqliteConnection, id: i32) -> Result<Vec<Hand>, DatabaseError> {
+pub fn get_hands_for_tournament(
+    conn: &mut SqliteConnection,
+    id: i32,
+) -> Result<Vec<Hand>, DatabaseError> {
     Ok(hands::dsl::hands
         .filter(hands::dsl::tournament_id.eq(id))
         .select(Hand::as_select())

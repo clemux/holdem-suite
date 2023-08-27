@@ -26,6 +26,13 @@ diesel::table! {
         ante -> Nullable<Double>,
         small_blind -> Double,
         big_blind -> Double,
+        pot -> Double,
+        rake -> Nullable<Double>,
+        flop1 -> Nullable<Text>,
+        flop2 -> Nullable<Text>,
+        flop3 -> Nullable<Text>,
+        turn -> Nullable<Text>,
+        river -> Nullable<Text>,
     }
 }
 

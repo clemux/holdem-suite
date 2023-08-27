@@ -11,5 +11,12 @@ CREATE TABLE hands (
     hero TEXT NOT NULL,
     ante DOUBLE NULL,
     small_blind DOUBLE NOT NULL,
-    big_blind DOUBLE NOT NULL
+    big_blind DOUBLE NOT NULL,
+    pot DOUBLE NOT NULL,
+    rake DOUBLE NULL,
+    flop1 VARCHAR(2) NULL,
+    flop2 VARCHAR(2) NULL,
+    flop3 VARCHAR(2) NULL,
+    turn VARCHAR(2) NULL,
+    river VARCHAR(2) NULL
 )
