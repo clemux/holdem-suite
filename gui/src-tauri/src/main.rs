@@ -65,7 +65,6 @@ fn open_replayer(
         "replayer",
         tauri::WindowUrl::App("replayer.html".into()),
     )
-    .decorations(false)
     .inner_size(800.0, 600.0)
     .resizable(true)
     .build()?;
