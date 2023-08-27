@@ -18,8 +18,6 @@ pub struct TableWindow {
     pub position: WindowGeometry,
 }
 
-
-
 pub struct WindowManager {}
 
 impl WindowManager {
@@ -31,7 +29,7 @@ impl WindowManager {
         let mut table_windows = vec![];
         for window in get_windows()? {
             if window.text.starts_with("Winamax ") {
-                table_windows.push ({
+                table_windows.push({
                     TableWindow {
                         table: Table::from_str(&window.text).unwrap(),
                         position: WindowGeometry {
@@ -46,8 +44,6 @@ impl WindowManager {
         }
         Ok(table_windows)
     }
-
-
 }
 
 #[derive(Debug)]
@@ -59,7 +55,6 @@ struct WindowsWindow {
     height: i32,
 }
 
-
 fn get_windows() -> Result<Vec<WindowsWindow>, ApplicationError> {
     let state: Box<Vec<WindowsWindow>> = Box::new(Vec::new());
     let ptr = Box::into_raw(state);
@@ -70,7 +65,6 @@ fn get_windows() -> Result<Vec<WindowsWindow>, ApplicationError> {
     };
     Ok(*state)
 }
-
 
 fn get_window_text(window: HWND) -> String {
     let mut text: [u16; 512] = [0; 512];
@@ -89,7 +83,6 @@ fn get_window_info(window: HWND) -> WINDOWINFO {
     }
     info.to_owned()
 }
-
 
 extern "system" fn enum_window(window: HWND, state: LPARAM) -> BOOL {
     let state = state.0 as *mut Vec<WindowsWindow>;

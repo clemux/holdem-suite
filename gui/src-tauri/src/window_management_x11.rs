@@ -1,10 +1,10 @@
-use std::str::FromStr;
+use crate::errors::ApplicationError;
+use crate::Table;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, Window};
 use x11rb::rust_connection::RustConnection;
-use crate::errors::ApplicationError;
-use crate::Table;
 x11rb::atom_manager! {
     pub Atoms: AtomsCookie {
         _NET_WM_NAME,
@@ -116,4 +116,3 @@ impl WindowManager {
         Ok(table_windows)
     }
 }
-
