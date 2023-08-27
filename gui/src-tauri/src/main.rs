@@ -21,10 +21,12 @@ use holdem_suite_db::{
     get_summaries, Player, TablePlayer,
 };
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
 struct Settings {
     database_url: String,
     watch_folder: String,
+    hud_enabled: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -672,9 +674,11 @@ fn setup_app(app: &App, settings: Settings) -> Result<(), Box<dyn std::error::Er
     let (tx, rx) = mpsc::channel();
     let database_url = settings.database_url.to_owned();
     thread::spawn(move || watch(watch_folder, database_url, app_handle, tx));
-    let app_handle = app.handle();
-    let database_url = settings.database_url.to_owned();
-    thread::spawn(move || watch_windows(app_handle, database_url, rx));
+    if settings.hud_enabled {
+        let app_handle = app.handle();
+        let database_url = settings.database_url.to_owned();
+        thread::spawn(move || watch_windows(app_handle, database_url, rx));
+    }
     Ok(())
 }
 
