@@ -52,6 +52,10 @@ const currentPlayer = computed<string>(() => {
   return currentAction.value?.player_name;
 });
 
+const button  = computed<number>(() => {
+  return seats.value.map(seat => seat.seat_number).filter(seat_number => seat_number <= props.hand.button).slice(-1)[0];
+});
+
 
 watch(() => props.hand, async (_, __) => {
   seats.value = await invoke("load_seats", {handId: props.hand.id});
@@ -81,7 +85,7 @@ onMounted(async () => {
       <div v-for="seat in seats">
         <ReplayerSeat :seat="seat" :maxPlayers="hand.max_players" :position="position(seat.seat_number)"
                       :isActive="seat.player_name == currentPlayer"
-                      :isButton="seat.seat_number == hand.button"
+                      :isButton="seat.seat_number == button"
                       :cards="holeCards"
         />
       </div>
