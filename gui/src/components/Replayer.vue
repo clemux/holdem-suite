@@ -94,16 +94,21 @@ onMounted(async () => {
       <button @click="firstAction()">Start</button>
       <button @click="previousAction()">Previous</button>
       <button @click="nextAction()">Next</button>
+      <q-slider v-model="currentActionIndex" :max="actions.length - 1" markers/>
     </div>
+
     <div>
-      Button {{ hand.button }}
-      <br>
       Current street {{ currentAction.street }}
     </div>
   </div>
 </template>
 
 <style scoped>
+.controls {
+  margin-top: 50px;
+  margin-left: 50px;
+  margin-right: 50px;
+}
 div#table {
   height: 209px;
   width: 400px;
