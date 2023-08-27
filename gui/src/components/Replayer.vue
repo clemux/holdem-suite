@@ -81,6 +81,7 @@ onMounted(async () => {
       <div v-for="seat in seats">
         <ReplayerSeat :seat="seat" :maxPlayers="hand.max_players" :position="position(seat.seat_number)"
                       :isActive="seat.player_name == currentPlayer"
+                      :isButton="seat.seat_number == hand.button"
                       :cards="holeCards"
         />
       </div>
@@ -91,7 +92,7 @@ onMounted(async () => {
       <button @click="nextAction()">Next</button>
     </div>
     <div>
-      Current player {{ currentPlayer }}
+      Button {{ hand.button }}
       <br>
       Current street {{ currentAction.street }}
     </div>

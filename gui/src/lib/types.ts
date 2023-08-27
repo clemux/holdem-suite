@@ -32,6 +32,7 @@ export type Hand = {
     datetime: string,
     max_players: number,
     hero: string,
+    button: number,
 }
 
 export type Seat = {

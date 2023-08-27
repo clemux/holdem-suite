@@ -9,6 +9,7 @@ const props = defineProps<{
   position: number,
   cards: [string, string] | null,
   isActive: boolean,
+  isButton: boolean,
 }>();
 
 const W = 207;
@@ -81,9 +82,10 @@ const translateStyle = computed(() => {
 
 </script>
 <template>
-  <div class="seat" :id="seat.seat_number" :style=translateStyle :class="{ active: isActive}">
+  <div class="seat" :id="seat.seat_number" :style=translateStyle :class="{ active: isActive, button: isButton}">
     <div class="playerName">{{ seat.player_name }}</div>
     <div class="playerStack">{{ seat.stack }}</div>
+    <div>{{ seat.seat_number }}</div>
     <br>
     <div v-if="cards" class="cards">
       <Card class="card card1" :text="cards[0]"/>
@@ -105,6 +107,10 @@ const translateStyle = computed(() => {
 
 .active {
   background-color: #0c97e3;
+}
+
+.button {
+  border: 2px solid #ff0000;
 }
 
 .card {
