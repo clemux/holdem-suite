@@ -3,9 +3,9 @@ import {Action, Hand, Seat} from "../lib/types";
 import ReplayerSeat from "./ReplayerSeat.vue";
 import {computed, onMounted, ref, watch} from "vue";
 import {invoke} from "@tauri-apps/api/tauri";
+import Card from "./Card.vue";
 
 const currentActionIndex = ref<number>(0);
-const pot = ref<number>(0);
 
 const props = defineProps<{
   hand: Hand;
@@ -14,6 +14,23 @@ const props = defineProps<{
 const seats = ref<Seat[]>([]);
 const actions = ref<Action[]>([]);
 const dataReady = ref<boolean>(false);
+
+const pot = computed(() => {
+  let ante_blinds = props.hand.ante * props.hand.max_players + props.hand.small_blind + props.hand.big_blind;
+  return ante_blinds + actions.value.slice(0, currentActionIndex.value).reduce((acc, action) => acc + action.amount, 0);
+});
+
+const flopVisible = computed(() => {
+  return currentAction.value.street != "preflop";
+});
+
+const turnVisible = computed(() => {
+  return currentAction.value.street == "turn" || currentAction.value.street == "river";
+});
+
+const riverVisible = computed(() => {
+  return currentAction.value.street == "river";
+});
 
 const position = function (seat_number: number): number {
   let hero_seat = seats.value.find(seat => seat.player_name == props.hand.hero)?.seat_number;
@@ -28,20 +45,17 @@ const holeCards = computed<[string, string]>(() => {
 async function nextAction() {
   if (currentActionIndex.value < actions.value.length) {
     currentActionIndex.value++;
-    pot.value += actions[currentActionIndex.value].amount;
   }
 }
 
 async function previousAction() {
   if (currentActionIndex.value > 0) {
     currentActionIndex.value--;
-    pot.value -= actions[currentActionIndex.value].amount;
   }
 }
 
 async function firstAction() {
   currentActionIndex.value = 0;
-  pot.value = 0;
 }
 
 const currentAction = computed<Action>(() => {
@@ -52,7 +66,7 @@ const currentPlayer = computed<string>(() => {
   return currentAction.value?.player_name;
 });
 
-const button  = computed<number>(() => {
+const button = computed<number>(() => {
   return seats.value.map(seat => seat.seat_number).filter(seat_number => seat_number <= props.hand.button).slice(-1)[0];
 });
 
@@ -79,6 +93,13 @@ onMounted(async () => {
       <div id="pot">
         <span>{{ pot }}</span>
       </div>
+      <div id="cards">
+        <Card class="card1" :text="hand.flop1" :isHidden="!flopVisible"/>
+        <Card class="card2" :text="hand.flop2" :isHidden="!flopVisible"/>
+        <Card class="card3" :text="hand.flop3" :isHidden="!flopVisible"/>
+        <Card class="card4" :text="hand.flop3" :isHidden="!turnVisible"/>
+        <Card class="card5" :text="hand.flop3" :isHidden="!riverVisible"/>
+      </div>
       <div v-if="currentAction" id="action">
         <span>{{ currentAction.action_type }} {{ currentAction.amount }} ({{ currentAction.is_all_in }})</span>
       </div>
@@ -99,6 +120,8 @@ onMounted(async () => {
 
     <div>
       Current street {{ currentAction.street }}
+      Blinds: {{hand.ante}}/{{ hand.small_blind }}/{{ hand.big_blind }}
+
     </div>
   </div>
 </template>
@@ -109,11 +132,12 @@ onMounted(async () => {
   margin-left: 50px;
   margin-right: 50px;
 }
+
 div#table {
-  height: 209px;
-  width: 400px;
+  height: 278px;
+  width: 533px;
   background-image: url("/table.png");
-  background-size: 400px;
+  background-size: 533px;
   position: relative;
   margin-left: 200px;
   margin-top: 100px;
@@ -121,15 +145,50 @@ div#table {
 
 #pot {
   position: absolute;
-  top: 43%;
+  top: 30%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: xx-large;
 }
 
+#cards {
+  position: absolute;
+  display: inline;
+  top: 50%;
+  left: 40%;
+}
+
+.card {
+  background: white;
+  position: absolute;
+  bottom: 110%;
+  width: 20px;
+  height: 30px;
+}
+
+.card1 {
+  left: 0;
+}
+
+.card2 {
+  left: 25px;
+}
+
+.card3 {
+  left: 50px;
+}
+
+.card4 {
+  left: 75px;
+}
+
+.card5 {
+  left: 100px;
+}
+
 #action {
   position: absolute;
-  top: 57%;
+  top: 70%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: xx-large;

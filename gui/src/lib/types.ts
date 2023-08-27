@@ -33,6 +33,14 @@ export type Hand = {
     max_players: number,
     hero: string,
     button: number,
+    ante: number,
+    small_blind: number,
+    big_blind: number,
+    flop1: string,
+    flop2: string,
+    flop3: string,
+    turn: string,
+    river: string,
 }
 
 export type Seat = {

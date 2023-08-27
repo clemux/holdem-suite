@@ -12,8 +12,8 @@ const props = defineProps<{
   isButton: boolean,
 }>();
 
-const W = 207;
-const H = 209;
+const W = 265;
+const H = 278;
 const D = Math.PI * H + 2 * W;
 
 

@@ -4,13 +4,20 @@ import {computed} from "vue";
 
 const props = defineProps<{
   text: string;
+  isHidden: boolean;
 }>();
 
 const rank = computed(() => {
-  return props.text.split("")[0];
+  if (!props.isHidden) {
+    return props.text.split("")[0];
+  }
+  return "?";
 });
 
 const suit = computed(() => {
+  if (props.isHidden) {
+    return "?";
+  }
   switch (props.text.split("")[1]) {
     case "s":
       return "♠";
@@ -23,12 +30,29 @@ const suit = computed(() => {
   }
 })
 
+const color = computed(() => {
+  if (props.isHidden) {
+    return "red";
+  }
+  switch (props.text.split("")[1]) {
+    case "s":
+      return {color: "black"};
+    case "h":
+      return {color: "red"};
+    case "d":
+      return {color: "blue"};
+    case "c":
+      return {color: "green"};
+  }
+})
+
+
 </script>
 
 <template>
   <div class="card">
-    <span class="rank">{{ rank }}</span>
-    <span class="suit">{{ suit }}</span>
+    <span class="rank" :style="color">{{ rank }}</span>
+    <span class="suit" :style="color">{{ suit }}</span>
   </div>
 </template>
 
