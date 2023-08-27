@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import {onMounted, ref} from "vue";
-import {Player, PlayerStats} from "../lib/types";
+import {PlayerStats} from "../lib/types";
 import {invoke} from "@tauri-apps/api/tauri";
-import {emit, listen} from "@tauri-apps/api/event";
+import {emit} from "@tauri-apps/api/event";
 import {appWindow} from "@tauri-apps/api/window";
 import PopupTitleBar from "./PopupTitleBar.vue";
 import PlayerHudStats from "./PlayerHudStats.vue";
 
 const stats = ref<PlayerStats | null>(null);
-const player = ref<Player | null>(null);
+const player = ref<string | null>(null);
 
 
 async function loadPlayerStats() {
   if (player.value) {
-    stats.value = await invoke("load_player_stats", {playerName: player.value.name});
+    stats.value = await invoke("load_player_stats", {playerName: player.value});
   }
 }
 
 async function listenHudEvent() {
-  return await appWindow.listen<Player>('hud', (event) => {
+  return await appWindow.listen<string>('hud', (event) => {
     console.log(event);
     player.value = event.payload;
     loadPlayerStats();

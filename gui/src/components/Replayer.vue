@@ -11,6 +11,9 @@ const props = defineProps<{
   hand: Hand;
 }>();
 
+const showCards = ref<boolean>(false);
+const showHud = ref<boolean>(false);
+
 const seats = ref<Seat[]>([]);
 const actions = ref<Action[]>([]);
 const dataReady = ref<boolean>(false);
@@ -34,6 +37,9 @@ const riverVisible = computed(() => {
 
 const position = function (seat_number: number): number {
   let hero_seat = seats.value.find(seat => seat.player_name == props.hand.hero)?.seat_number;
+  if (hero_seat === undefined) {
+    throw new Error("Hero seat not found");
+  }
   return (seat_number + (props.hand.max_players - hero_seat)) % props.hand.max_players;
 }
 
@@ -70,6 +76,13 @@ const button = computed<number>(() => {
   return seats.value.map(seat => seat.seat_number).filter(seat_number => seat_number <= props.hand.button).slice(-1)[0];
 });
 
+function seatCards(seat: Seat): [string | null, string | null] {
+  if (seat.player_name == props.hand.hero) {
+    return holeCards.value;
+  }
+  return [seat.card1, seat.card2];
+}
+
 
 watch(() => props.hand, async (_, __) => {
   seats.value = await invoke("load_seats", {handId: props.hand.id});
@@ -94,20 +107,23 @@ onMounted(async () => {
         <span>{{ pot }}</span>
       </div>
       <div id="cards">
-        <Card class="card1" :text="hand.flop1" :isHidden="!flopVisible"/>
-        <Card class="card2" :text="hand.flop2" :isHidden="!flopVisible"/>
-        <Card class="card3" :text="hand.flop3" :isHidden="!flopVisible"/>
-        <Card class="card4" :text="hand.flop3" :isHidden="!turnVisible"/>
-        <Card class="card5" :text="hand.flop3" :isHidden="!riverVisible"/>
+        <Card class="card card1" :text="hand.flop1" :isHidden="!flopVisible"/>
+        <Card class="card card2" :text="hand.flop2" :isHidden="!flopVisible"/>
+        <Card class="card card3" :text="hand.flop3" :isHidden="!flopVisible"/>
+        <Card class="card card4" :text="hand.flop3" :isHidden="!turnVisible"/>
+        <Card class="card card5" :text="hand.flop3" :isHidden="!riverVisible"/>
       </div>
       <div v-if="currentAction" id="action">
-        <span>{{ currentAction.action_type }} {{ currentAction.amount }} ({{ currentAction.is_all_in }})</span>
+        <span>{{ currentAction.action_type }} {{ currentAction.amount }}</span>
+        <span class="all-in" v-if="currentAction.is_all_in">(All-In!)</span>
       </div>
       <div v-for="seat in seats">
         <ReplayerSeat :seat="seat" :maxPlayers="hand.max_players" :position="position(seat.seat_number)"
                       :isActive="seat.player_name == currentPlayer"
                       :isButton="seat.seat_number == button"
-                      :cards="holeCards"
+                      :cards="seatCards(seat)"
+                      :showHud="showHud"
+                      :show-cards="showCards || seat.player_name == props.hand.hero"
         />
       </div>
     </div>
@@ -119,8 +135,11 @@ onMounted(async () => {
     </div>
 
     <div>
-      Current street {{ currentAction.street }}
-      Blinds: {{hand.ante}}/{{ hand.small_blind }}/{{ hand.big_blind }}
+      Blinds: {{ hand.ante }}/{{ hand.small_blind }}/{{ hand.big_blind }}
+      <div class="q-pa-md">
+        <q-checkbox v-model="showCards" label="Show cards"/>
+        <q-checkbox v-model="showHud" label="Show HUD"/>
+      </div>
 
     </div>
   </div>
@@ -192,5 +211,9 @@ div#table {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: xx-large;
+}
+
+.all-in {
+  font-size: medium;
 }
 </style>

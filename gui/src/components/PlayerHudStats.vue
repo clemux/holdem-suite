@@ -1,17 +1,17 @@
 <script setup lang="ts">
 
-import {Player, PlayerStats} from "../lib/types";
+import {PlayerStats} from "../lib/types";
 import {invoke} from "@tauri-apps/api/tauri";
 import {onMounted, ref, watch} from "vue";
 import {listen} from "@tauri-apps/api/event";
 
 const stats = ref<PlayerStats | null>(null);
 const props = defineProps<{
-  player: Player;
+  player: string;
 }>();
 
 async function loadPlayerStats() {
-  stats.value = await invoke("load_player_stats", {playerName: props.player.name});
+  stats.value = await invoke("load_player_stats", {playerName: props.player});
 }
 
 
@@ -42,7 +42,7 @@ onMounted(() => {
 <template>
   <table v-if="stats" @click="openPopup()">
     <tr>
-      <td colspan="3">{{ player.name }}</td>
+      <td colspan="3" :title="player">{{ player }}</td>
       <td>{{ stats.nb_hands }}</td>
     </tr>
     <tr>

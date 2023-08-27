@@ -3,19 +3,19 @@
 import {computed} from "vue";
 
 const props = defineProps<{
-  text: string;
+  text: string|null;
   isHidden: boolean;
 }>();
 
 const rank = computed(() => {
-  if (!props.isHidden) {
+  if (!props.isHidden && props.text) {
     return props.text.split("")[0];
   }
   return "?";
 });
 
 const suit = computed(() => {
-  if (props.isHidden) {
+  if (props.isHidden || !props.text) {
     return "?";
   }
   switch (props.text.split("")[1]) {
@@ -31,8 +31,8 @@ const suit = computed(() => {
 })
 
 const color = computed(() => {
-  if (props.isHidden) {
-    return "red";
+  if (props.isHidden || !props.text) {
+    return {color: "grey"};
   }
   switch (props.text.split("")[1]) {
     case "s":

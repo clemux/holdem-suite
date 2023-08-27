@@ -1,7 +1,6 @@
-import { createApp } from "vue";
+import {createApp} from "vue";
 import "./styles.css";
-import { Quasar } from 'quasar'
-import { invoke } from '@tauri-apps/api/tauri'
+import {Quasar} from 'quasar'
 
 // Import icon libraries
 import '@quasar/extras/material-icons/material-icons.css'

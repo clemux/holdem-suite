@@ -2,14 +2,17 @@
 import {Seat} from "../lib/types";
 import {computed} from "vue";
 import Card from "./Card.vue";
+import PlayerHudStats from "./PlayerHudStats.vue";
 
 const props = defineProps<{
   seat: Seat;
   maxPlayers: number,
   position: number,
-  cards: [string, string] | null,
+  cards: [string | null, string | null] | null,
   isActive: boolean,
   isButton: boolean,
+  showHud: boolean,
+  showCards: boolean,
 }>();
 
 const W = 265;
@@ -82,22 +85,22 @@ const translateStyle = computed(() => {
 
 </script>
 <template>
-  <div class="seat" :id="seat.seat_number" :style=translateStyle :class="{ active: isActive, button: isButton}">
-    <div class="playerName">{{ seat.player_name }}</div>
+  <div class="seat" :style=translateStyle :class="{ active: isActive, button: isButton}">
+    <PlayerHudStats v-if="showHud" :player="seat.player_name"/>
+    <div v-if="!showHud" class="playerName">{{ seat.player_name }}</div>
     <div class="playerStack">{{ seat.stack }}</div>
-    <div>{{ seat.seat_number }}</div>
     <br>
     <div v-if="cards" class="cards">
-      <Card class="card card1" :text="cards[0]"/>
-      <Card class="card card2" :text="cards[1]"/>
+      <Card class="card card1" :text="cards[0]" :isHidden="!showCards"/>
+      <Card class="card card2" :text="cards[1]" :isHidden="!showCards"/>
     </div>
   </div>
 </template>
 <style scoped>
 
 .seat {
-  height: 40px;
-  width: 80px;
+  height: 65px;
+  width: 120px;
   background-color: #d0dbe1;
   position: absolute;
   text-align: center;

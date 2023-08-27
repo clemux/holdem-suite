@@ -49,6 +49,8 @@ export type Seat = {
     seat_number: number,
     stack: number,
     bounty: number | null,
+    card1: string | null,
+    card2: string | null,
 }
 
 export type Action = {

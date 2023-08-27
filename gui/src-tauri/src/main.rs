@@ -432,11 +432,11 @@ impl HudWindow {
         .build()?;
 
         let label = window_label.to_owned();
-        let player_copy = player.to_owned();
+        let player_name = player.name.to_owned();
         window.once("hudReady", move |_msg| {
             let window = app_handle.get_window(&label).expect("Error getting window");
             window
-                .emit("hud", player_copy)
+                .emit("hud", player_name)
                 .expect("Error emitting hud event");
         });
         Ok(HudWindow {
