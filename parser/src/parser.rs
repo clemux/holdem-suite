@@ -645,8 +645,8 @@ impl Street {
 }
 
 #[derive(Debug, PartialEq)]
-struct Board {
-    cards: Vec<Card>,
+pub struct Board {
+    pub cards: Vec<Option<Card>>,
 }
 
 impl Board {
@@ -656,18 +656,20 @@ impl Board {
             terminated(separated_list0(tag(" "), Card::parse), tag("]")),
             line_ending,
         ))(input)?;
+        let mut cards: Vec<Option<Card>> = cards.into_iter().map(Some).collect();
+        cards.resize_with(5, || None);
         Ok((input, Board { cards }))
     }
 }
 
 #[derive(Debug, PartialEq)]
-enum SummaryResult {
+pub enum SummaryResult {
     Won(f64),
     Lost,
 }
 
 #[derive(Debug, PartialEq)]
-enum HandCategory {
+pub enum HandCategory {
     HighCard(Rank),
     Pair(Rank),
     TwoPair(Rank, Rank),
@@ -742,12 +744,12 @@ impl HandCategory {
 }
 
 #[derive(Debug, PartialEq)]
-struct SummaryPlayer {
-    name: String,
-    seat: u32,
-    hole_cards: Option<HoleCards>,
-    result: SummaryResult,
-    hand_category: Option<HandCategory>,
+pub struct SummaryPlayer {
+    pub name: String,
+    pub seat: u32,
+    pub hole_cards: Option<HoleCards>,
+    pub result: SummaryResult,
+    pub hand_category: Option<HandCategory>,
 }
 
 impl SummaryPlayer {
@@ -787,10 +789,10 @@ impl SummaryPlayer {
 
 #[derive(Debug, PartialEq)]
 pub struct Summary {
-    pot: f64,
-    rake: Option<f64>,
-    players: Vec<SummaryPlayer>,
-    board: Option<Board>,
+    pub pot: f64,
+    pub rake: Option<f64>,
+    pub players: Vec<SummaryPlayer>,
+    pub board: Option<Board>,
 }
 
 impl Summary {
@@ -1335,26 +1337,26 @@ mod tests {
         let input = "Board: [8s 7h 4h 3s 2h]\n";
         let expected = Board {
             cards: vec![
-                Card {
+                Some(Card {
                     rank: Rank::Eight,
                     suit: Suit::Spades,
-                },
-                Card {
+                }),
+                Some(Card {
                     rank: Rank::Seven,
                     suit: Suit::Hearts,
-                },
-                Card {
+                }),
+                Some(Card {
                     rank: Rank::Four,
                     suit: Suit::Hearts,
-                },
-                Card {
+                }),
+                Some(Card {
                     rank: Rank::Three,
                     suit: Suit::Spades,
-                },
-                Card {
+                }),
+                Some(Card {
                     rank: Rank::Two,
                     suit: Suit::Hearts,
-                },
+                }),
             ],
         };
         let (_, actual) = Board::parse(input).unwrap();
@@ -1506,26 +1508,26 @@ mod tests {
             }],
             board: Some(Board {
                 cards: vec![
-                    Card {
+                    Some(Card {
                         rank: Rank::Eight,
                         suit: Suit::Clubs,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Five,
                         suit: Suit::Hearts,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Ten,
                         suit: Suit::Spades,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::King,
                         suit: Suit::Diamonds,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Ten,
                         suit: Suit::Diamonds,
-                    },
+                    }),
                 ],
             }),
         };
@@ -1549,26 +1551,26 @@ mod tests {
             }],
             board: Some(Board {
                 cards: vec![
-                    Card {
+                    Some(Card {
                         rank: Rank::Eight,
                         suit: Suit::Spades,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Seven,
                         suit: Suit::Hearts,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Four,
                         suit: Suit::Hearts,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Three,
                         suit: Suit::Spades,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Two,
                         suit: Suit::Hearts,
-                    },
+                    }),
                 ],
             }),
         };
@@ -1625,26 +1627,26 @@ mod tests {
             ],
             board: Some(Board {
                 cards: vec![
-                    Card {
+                    Some(Card {
                         rank: Rank::Three,
                         suit: Suit::Spades,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::King,
                         suit: Suit::Spades,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Queen,
                         suit: Suit::Hearts,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Two,
                         suit: Suit::Spades,
-                    },
-                    Card {
+                    }),
+                    Some(Card {
                         rank: Rank::Two,
                         suit: Suit::Clubs,
-                    },
+                    }),
                 ],
             }),
         };
