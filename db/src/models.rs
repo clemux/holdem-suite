@@ -85,4 +85,6 @@ pub struct Seat {
     pub seat_number: i32,
     pub stack: f64,
     pub bounty: Option<f64>,
+    pub card1: Option<String>,
+    pub card2: Option<String>,
 }

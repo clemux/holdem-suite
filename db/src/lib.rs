@@ -100,6 +100,20 @@ pub fn insert_hands(
             }
             nb_hands += 1;
             for seat in hand.seats.iter() {
+                let summary_player = hand
+                    .summary
+                    .players
+                    .iter()
+                    .find(|player| player.name == seat.player_name);
+                let (card1, card2) = match summary_player {
+                    Some(player) => match player.hole_cards {
+                        Some(ref cards) => {
+                            (Some(cards.card1.to_string()), Some(cards.card2.to_string()))
+                        }
+                        None => (None, None),
+                    },
+                    None => (None, None),
+                };
                 diesel::insert_or_ignore_into(seats::table)
                     .values(Seat {
                         hand_id: hand.hand_info.hand_id.to_owned(),
@@ -107,6 +121,8 @@ pub fn insert_hands(
                         seat_number: seat.seat_number as i32,
                         stack: seat.stack,
                         bounty: seat.bounty,
+                        card1,
+                        card2,
                     })
                     .execute(conn)
                     .expect("Error saving seat");

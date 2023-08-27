@@ -43,6 +43,8 @@ diesel::table! {
         seat_number -> Integer,
         stack -> Double,
         bounty -> Nullable<Double>,
+        card1 -> Nullable<Text>,
+        card2 -> Nullable<Text>,
     }
 }
 

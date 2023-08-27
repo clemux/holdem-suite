@@ -6,5 +6,7 @@ CREATE TABLE seats
     seat_number INTEGER NOT NULL,
     stack DOUBLE NOT NULL,
     bounty DOUBLE NULL,
+    card1 TEXT NULL,
+    card2 TEXT NULL,
     PRIMARY KEY (hand_id, seat_number)
 )
