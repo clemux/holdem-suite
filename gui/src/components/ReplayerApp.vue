@@ -24,13 +24,13 @@ async function listenReplayerEvent() {
 }
 
 async function previous() {
-    if (selectedHandIndex?.value > 0) {
+    if (selectedHandIndex.value && selectedHandIndex.value > 0) {
       selectedHandIndex.value--;
     }
 }
 
 async function next() {
-    if (selectedHandIndex?.value < hands.value.length - 1) {
+    if (selectedHandIndex.value && selectedHandIndex.value < hands.value.length - 1) {
       selectedHandIndex.value++;
     }
 }
@@ -43,13 +43,15 @@ onMounted(() => {
 </script>
 
 <template>
+  <div class="test">
   <div class="controls">
     <button @click="previous">Previous</button>
     <q-slider class="slider" v-model="selectedHandIndex" :max="hands.length - 1" markers/>
     <button @click="next">Next</button>
   </div>
-  <div v-if="selectedHandIndex != null">
+  <div v-if="selectedHand">
     <Replayer :hand="selectedHand"/>
+  </div>
   </div>
 </template>
 
@@ -63,5 +65,9 @@ onMounted(() => {
 .slider {
   margin-left: 20px;
   margin-right: 20px;
+}
+
+.test {
+  background-color: #644b4e;
 }
 </style>

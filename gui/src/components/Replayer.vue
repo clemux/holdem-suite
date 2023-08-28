@@ -106,16 +106,12 @@ onMounted(async () => {
       <div id="pot">
         <span>{{ pot }}</span>
       </div>
-      <div id="cards">
+      <div class="cards">
         <Card class="card card1" :text="hand.flop1" :isHidden="!flopVisible"/>
         <Card class="card card2" :text="hand.flop2" :isHidden="!flopVisible"/>
         <Card class="card card3" :text="hand.flop3" :isHidden="!flopVisible"/>
-        <Card class="card card4" :text="hand.flop3" :isHidden="!turnVisible"/>
-        <Card class="card card5" :text="hand.flop3" :isHidden="!riverVisible"/>
-      </div>
-      <div v-if="currentAction" id="action">
-        <span>{{ currentAction.action_type }} {{ currentAction.amount }}</span>
-        <span class="all-in" v-if="currentAction.is_all_in">(All-In!)</span>
+        <Card class="card card4" :text="hand.turn" :isHidden="!turnVisible"/>
+        <Card class="card card5" :text="hand.river" :isHidden="!riverVisible"/>
       </div>
       <div v-for="seat in seats">
         <ReplayerSeat :seat="seat" :maxPlayers="hand.max_players" :position="position(seat.seat_number)"
@@ -124,6 +120,7 @@ onMounted(async () => {
                       :cards="seatCards(seat)"
                       :showHud="showHud"
                       :show-cards="showCards || seat.player_name == props.hand.hero"
+                      :action="seat.player_name == currentPlayer ? currentAction : null"
         />
       </div>
     </div>
@@ -170,50 +167,33 @@ div#table {
   font-size: xx-large;
 }
 
-#cards {
+.cards {
   position: absolute;
   display: inline;
-  top: 50%;
-  left: 40%;
+  top: 40%;
+  left: 30%;
 }
 
-.card {
-  background: white;
-  position: absolute;
-  bottom: 110%;
-  width: 20px;
-  height: 30px;
-}
 
 .card1 {
   left: 0;
 }
 
 .card2 {
-  left: 25px;
+  left: 45px;
 }
 
 .card3 {
-  left: 50px;
+  left: 90px;
 }
 
 .card4 {
-  left: 75px;
+  left: 135px;
 }
 
 .card5 {
-  left: 100px;
+  left: 180px;
 }
 
-#action {
-  position: absolute;
-  top: 70%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: xx-large;
-}
 
-.all-in {
-  font-size: medium;
-}
 </style>

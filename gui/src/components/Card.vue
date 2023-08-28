@@ -32,7 +32,7 @@ const suit = computed(() => {
 
 const color = computed(() => {
   if (props.isHidden || !props.text) {
-    return {color: "grey"};
+    return {color: "grey", opacity: 0.2};
   }
   switch (props.text.split("")[1]) {
     case "s":
@@ -47,15 +47,28 @@ const color = computed(() => {
 })
 
 
+
 </script>
 
 <template>
-  <div class="card">
-    <span class="rank" :style="color">{{ rank }}</span>
-    <span class="suit" :style="color">{{ suit }}</span>
+  <div class="card" :class="{hiddenx: isHidden || !text}">
+    <span class="rank absolute-top-left"  :style="color">{{ rank }}</span>
+    <span class="suit absolute-bottom-right" :style="color">{{ suit }}</span>
   </div>
 </template>
 
 <style scoped>
+.card {
+  background: #ffffff;
+  position: absolute;
+  top: 0;
+  width: 40px;
+  height: 50px;
+  font-size: large;
+}
+
+.hiddenx {
+  background-color: #c0c0c0;
+}
 
 </style>

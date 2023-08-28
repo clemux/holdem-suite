@@ -11,4 +11,7 @@ import ReplayerApp from "./components/ReplayerApp.vue";
 
 createApp(ReplayerApp).use(Quasar, {
     plugins: {},
+    config: {
+        dark: true,
+    }
 }).mount("#app");
