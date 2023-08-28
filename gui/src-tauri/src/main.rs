@@ -65,8 +65,12 @@ fn open_replayer(
         "replayer",
         tauri::WindowUrl::App("replayer.html".into()),
     )
-    .inner_size(800.0, 600.0)
+    .inner_size(1280.0, 1024.0)
     .resizable(true)
+    .title(format!(
+        "Holdem Suite Tracker - Replayer (Tournament #{})",
+        tournament_id
+    ))
     .build()?;
     let label = window.label().to_owned();
     let mut conn = establish_connection(&state.database_url);
